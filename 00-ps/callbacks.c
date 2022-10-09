@@ -6,7 +6,7 @@
 void report_process(pid_t pid, const char *exe, char **argv, char **envp)
 {
 	printf("pid %ld:\n", (long int)pid);
-	printf("  exe = '%s'\n", exe);
+	printf("  exe_path = '%s'\n", exe);
 
 	printf("  argv = [");
 	for (char **x = argv; *x != NULL; ++x)
