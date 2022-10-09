@@ -71,7 +71,7 @@ void ps(void)
             continue;
         }
         i = 0;
-        while (fscanf(p_file, "%s", argv_buf[i]) != EOF) {
+        while (fgets(argv_buf[i], MAX_READ_SIZE, p_file) != NULL && argv_buf[i][0] != 0) {
             argv[i] = argv_buf[i];
             ++i;
         }
@@ -91,7 +91,7 @@ void ps(void)
         envp[i] = NULL;
         fclose(p_file);
 
-        report_process(pid, exec_path, argv + 1, envp);
+        report_process(pid, exec_path, argv, envp);
     }
 
     closedir(p_proc);
