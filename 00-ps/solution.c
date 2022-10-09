@@ -6,9 +6,9 @@
 #include <bits/types/FILE.h>
 #include <stdio.h>
 
-#define MAX_SIZE 100
+#define MAX_SIZE 200
 #define MAX_EXE_PATH_LEN 200
-#define MAX_READ_SIZE 10000
+#define MAX_READ_SIZE 5000
 
 const char* proc_dir = "/proc/";
 const char* cmdline_path = "/cmdline";
@@ -31,6 +31,7 @@ void ps(void)
 {
     struct dirent* p_dirent;
     int i;
+    size_t n = MAX_READ_SIZE;
     DIR* p_proc;
     if ((p_proc = opendir(proc_dir)) == NULL) {
         report_error(proc_dir, errno);
@@ -40,14 +41,14 @@ void ps(void)
     char filepath[MAX_EXE_PATH_LEN];
     char exec_path[MAX_EXE_PATH_LEN];
 
-    char** const argv_buf = malloc(MAX_SIZE * sizeof(char*));
-    char** const envp_buf = malloc(MAX_SIZE * sizeof(char*));
-    char *argv[MAX_SIZE];
-    char *envp[MAX_SIZE];
+    char* argv_buf[MAX_SIZE];
+    char* envp_buf[MAX_SIZE];
     for (int j = 0; j < MAX_SIZE; ++j) {
-        argv_buf[j] = malloc(MAX_READ_SIZE * sizeof(char));
-        envp_buf[j] = malloc(MAX_READ_SIZE * sizeof(char));
+        argv_buf[j] = (char*) malloc(MAX_READ_SIZE * sizeof(char));
+        envp_buf[j] = (char*) malloc(MAX_READ_SIZE * sizeof(char));
     }
+    char* argv[MAX_SIZE];
+    char* envp[MAX_SIZE];
 
     while ((p_dirent = readdir(p_proc)) != NULL) {
         strcpy(filename, p_dirent->d_name);
@@ -71,9 +72,10 @@ void ps(void)
             continue;
         }
         i = 0;
-        while (fgets(argv_buf[i], MAX_READ_SIZE, p_file) != NULL && argv_buf[i][0] != 0) {
+        while (getdelim(&argv_buf[i], &n, '\0', p_file) != -1 && argv_buf[i][0] != 0) {
             argv[i] = argv_buf[i];
             ++i;
+            n = MAX_READ_SIZE;
         }
         argv[i] = NULL;
         fclose(p_file);
@@ -84,9 +86,10 @@ void ps(void)
             continue;
         }
         i = 0;
-        while (fgets(envp_buf[i], MAX_READ_SIZE, p_file) != NULL && envp_buf[i][0] != 0) {
+        while (getdelim(&envp_buf[i], &n, '\0', p_file) != -1 && envp_buf[i][0] != 0) {
             envp[i] = envp_buf[i];
             ++i;
+            n = MAX_READ_SIZE;
         }
         envp[i] = NULL;
         fclose(p_file);
@@ -99,6 +102,4 @@ void ps(void)
         free(argv_buf[j]);
         free(envp_buf[j]);
     }
-    free(argv_buf);
-    free(envp_buf);
 }
