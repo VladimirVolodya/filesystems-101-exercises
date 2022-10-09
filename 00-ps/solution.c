@@ -8,7 +8,7 @@
 
 #define MAX_SIZE 200
 #define MAX_EXE_PATH_LEN 200
-#define MAX_READ_SIZE 5000
+#define MAX_READ_SIZE 100000
 
 const char* proc_dir = "/proc/";
 const char* cmdline_path = "/cmdline";
@@ -31,7 +31,6 @@ void ps(void)
 {
     struct dirent* p_dirent;
     int i;
-    size_t n = MAX_READ_SIZE;
     DIR* p_proc;
     if ((p_proc = opendir(proc_dir)) == NULL) {
         report_error(proc_dir, errno);
@@ -43,9 +42,12 @@ void ps(void)
 
     char* argv_buf[MAX_SIZE];
     char* envp_buf[MAX_SIZE];
+    size_t argv_sizes[MAX_SIZE];
+    size_t envp_sizes[MAX_SIZE];
     for (int j = 0; j < MAX_SIZE; ++j) {
         argv_buf[j] = (char*) malloc(MAX_READ_SIZE * sizeof(char));
         envp_buf[j] = (char*) malloc(MAX_READ_SIZE * sizeof(char));
+        argv_sizes[j] = envp_sizes[j] = MAX_READ_SIZE * sizeof(char);
     }
     char* argv[MAX_SIZE];
     char* envp[MAX_SIZE];
@@ -72,10 +74,9 @@ void ps(void)
             continue;
         }
         i = 0;
-        while (getdelim(&argv_buf[i], &n, '\0', p_file) != -1 && argv_buf[i][0] != 0) {
+        while (getdelim(&argv_buf[i], &argv_sizes[i], '\0', p_file) != -1 && argv_buf[i][0] != 0) {
             argv[i] = argv_buf[i];
             ++i;
-            n = MAX_READ_SIZE;
         }
         argv[i] = NULL;
         fclose(p_file);
@@ -86,10 +87,9 @@ void ps(void)
             continue;
         }
         i = 0;
-        while (getdelim(&envp_buf[i], &n, '\0', p_file) != -1 && envp_buf[i][0] != 0) {
+        while (getdelim(&envp_buf[i], &envp_sizes[i], '\0', p_file) != -1 && envp_buf[i][0] != 0) {
             envp[i] = envp_buf[i];
             ++i;
-            n = MAX_READ_SIZE;
         }
         envp[i] = NULL;
         fclose(p_file);
