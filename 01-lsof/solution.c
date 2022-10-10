@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAX_PATH_LEN 1000
+#define MAX_PATH_LEN 400
 
 const char* proc_dir = "/proc/";
 const char* fd_dir = "/fd/";
@@ -16,6 +16,12 @@ int isNumber(char* str) {
         ++str;
     }
     return 1;
+}
+
+void clearStr(char* str, int size) {
+    for (int i = 0; i < size; ++i) {
+        str[i] = '\0';
+    }
 }
 
 void buildPath(char* const prev_path, const char* const pid, const char* const fd) {
@@ -56,6 +62,7 @@ void lsof(void)
 
         while ((p_dirent = readdir(p_fd_dir)) != NULL) {
             buildPath(path, filename, p_dirent->d_name);
+            clearStr(filepath, MAX_PATH_LEN);
             if ((readlink(path, filepath, MAX_PATH_LEN)) == -1) {
                 report_error(path, errno);
                 continue;
