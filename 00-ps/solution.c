@@ -6,7 +6,7 @@
 #include <bits/types/FILE.h>
 #include <stdio.h>
 
-#define MAX_SIZE 500
+#define MAX_SIZE 10000
 #define MAX_EXE_PATH_LEN 200
 #define MAX_READ_SIZE 10000
 
