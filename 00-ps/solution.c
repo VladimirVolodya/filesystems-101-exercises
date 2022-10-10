@@ -8,7 +8,7 @@
 
 #define MAX_SIZE 200
 #define MAX_EXE_PATH_LEN 200
-#define MAX_READ_SIZE 100000
+#define MAX_READ_SIZE 10000
 
 const char* proc_dir = "/proc/";
 const char* cmdline_path = "/cmdline";
@@ -21,7 +21,7 @@ void buildPath(char* path, const char* pid, const char* filename) {
     strcat(path, filename);
 }
 
-void clear(char* str, int size) {
+void clearStr(char* str, int size) {
     for (int i = 0; i < size; ++i) {
         str[i] = 0;
     }
@@ -61,7 +61,7 @@ void ps(void)
         }
 
         buildPath(filepath, filename, exe_path);
-        clear(exec_path, MAX_EXE_PATH_LEN);
+        clearStr(exec_path, MAX_EXE_PATH_LEN);
         if (readlink(filepath, exec_path, MAX_EXE_PATH_LEN) == -1) {
             report_error(filepath, errno);
             continue;
