@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAX_PATH_LEN 200
+#define MAX_PATH_LEN 1000
 
 const char* proc_dir = "/proc/";
 const char* fd_dir = "/fd/";
