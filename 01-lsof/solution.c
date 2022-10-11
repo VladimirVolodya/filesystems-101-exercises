@@ -44,7 +44,7 @@ void reportMapFiles(char** strs, int size) {
     }
     if (size == 1) {
         report_file(strs[0]);
-    } else if (size > 1 && !strcmp(strs[size - 1], strs[size - 2])) {
+    } else if (size > 1 && strcmp(strs[size - 1], strs[size - 2])) {
         report_file(strs[size - 1]);
     }
 }
