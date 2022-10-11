@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX_FILES_OPEN 4000
+#define MAX_FILES_OPEN 10000
 #define MAX_PATH_LEN 2000
 
 const char* proc_dir = "/proc/";
@@ -106,9 +106,12 @@ void lsof(void)
                 }
                 buildPath(path, filename, subdir, p_dirent->d_name);
                 clearStr(path_bufs[idx], MAX_PATH_LEN);
-                if ((readlink(path, path_bufs[idx], MAX_PATH_LEN)) == -1) {
+                long res = readlink(path, path_bufs[idx], MAX_PATH_LEN);
+                if (res == -1) {
                     report_error(path, errno);
                     continue;
+                } else {
+                    path[res] = '\0';
                 }
                 ++idx;
             }
