@@ -4,8 +4,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX_FILES_OPEN 10000
-#define MAX_PATH_LEN 2000
+#define MAX_FILES_OPEN 2000
+#define MAX_PATH_LEN 10000
 
 const char* proc_dir = "/proc/";
 const char* fd_dir = "/fd/";
