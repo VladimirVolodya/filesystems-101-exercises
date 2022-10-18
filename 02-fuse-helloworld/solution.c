@@ -13,7 +13,7 @@ static int hello_getattr(const char* path, struct stat* st,
     (void) fi;
     memset(st, 0, sizeof(struct stat));
     int res = 0;
-    if (!strcmp(path, "/") {
+    if (!strcmp(path, "/")) {
         st->st_mode = S_IFDIR | 0755;
         st->st_nlink = 2;
     } else if (!strcmp(path + 1, filename)) {
@@ -58,7 +58,7 @@ static int hello_open(const char *path, struct fuse_file_info *fi) {
 
 static int hello_read(const char *path, char *buf, size_t size, off_t offset,
                       struct fuse_file_info *fi) {
-        size_t len;
+        long int len;
         (void) fi;
         if(strcmp(path+1, filename)) {
             return -ENOENT;
@@ -88,8 +88,7 @@ static const struct fuse_operations hellofs_ops = {
         .read = hello_read,
 };
 
-int helloworld(const char *mntp)
-{
+int helloworld(const char *mntp) {
 	char *argv[] = {"exercise", "-f", (char *)mntp, NULL};
 	return fuse_main(3, argv, &hellofs_ops, NULL);
 }
