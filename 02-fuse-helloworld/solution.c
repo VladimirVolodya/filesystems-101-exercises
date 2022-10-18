@@ -70,7 +70,7 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
         len = strlen(output);
 
         if (offset < len) {
-            if (offset + size > len) {
+            if (offset + (long) size > len) {
                 size = len - offset;
             }
             memcpy(buf, output + offset, size);
