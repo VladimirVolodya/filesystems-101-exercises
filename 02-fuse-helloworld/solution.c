@@ -1,9 +1,91 @@
 #include <solution.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 
 #include <fuse.h>
 
+static const char* filename = "hello";
+static const char* content_format = "hello, %d\n";
+
+static int hello_getattr(const char* path, struct stat* st,
+                         struct fuse_file_info* fi) {
+    (void) fi;
+    memset(st, 0, sizeof(struct stat));
+    int res = 0;
+    if (!strcmp(path, "/") {
+        st->st_mode = S_IFDIR | 0755;
+        st->st_nlink = 2;
+    } else if (!strcmp(path + 1, filename)) {
+        st->st_mode = S_IFREG | 0444;
+        st->st_nlink = 1;
+        st->st_size = strlen(content_format + 8);
+    } else {
+        res = -ENOENT;
+    }
+    return res;
+}
+
+static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                         off_t offset, struct fuse_file_info *fi,
+                         enum fuse_readdir_flags flags) {
+        (void) offset;
+        (void) fi;
+        (void) flags;
+ 
+        if (strcmp(path, "/") != 0) {
+            return -ENOENT;
+        } 
+
+        filler(buf, ".", NULL, 0, 0);
+        filler(buf, "..", NULL, 0, 0);
+        filler(buf, filename, NULL, 0, 0);
+ 
+        return 0;
+}
+
+static int hello_open(const char *path, struct fuse_file_info *fi) {
+        if (strcmp(path+1, filename)) {
+            return -ENOENT;
+        }
+
+        if ((fi->flags & O_ACCMODE) != O_RDONLY) {
+            return -EACCES;
+        }
+ 
+        return 0;
+}
+
+static int hello_read(const char *path, char *buf, size_t size, off_t offset,
+                      struct fuse_file_info *fi) {
+        size_t len;
+        (void) fi;
+        if(strcmp(path+1, filename)) {
+            return -ENOENT;
+        }
+
+        struct fuse_context* context = fuse_get_context();
+        char output[100];
+        sprintf(output, content_format, context->pid, '\0');
+        len = strlen(output);
+
+        if (offset < len) {
+            if (offset + size > len) {
+                size = len - offset;
+            }
+            memcpy(buf, output + offset, size);
+        } else {
+            size = 0;
+        }
+ 
+        return size;
+}
+
 static const struct fuse_operations hellofs_ops = {
-	/* implement me */
+	    .getattr = hello_getattr,
+        .readdir = hello_readdir,
+        .open = hello_open,
+        .read = hello_read,
 };
 
 int helloworld(const char *mntp)
