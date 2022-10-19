@@ -82,11 +82,19 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int hello_write(const char* req, const char *buf, size_t size,
-                          off_t off, struct fuse_file_info *fi) {
+                       off_t off, struct fuse_file_info *fi) {
     (void) req;
     (void) buf;
     (void) size;
     (void) off;
+    (void) fi;
+    return -EROFS;
+}
+
+static int hello_create(const char *path, mode_t mode,
+                        struct fuse_file_info *fi) {
+    (void) path;
+    (void) mode;
     (void) fi;
     return -EROFS;
 }
@@ -103,3 +111,4 @@ int helloworld(const char *mntp) {
 	char *argv[] = {"exercise", "-f", (char *)mntp, NULL};
 	return fuse_main(3, argv, &hellofs_ops, NULL);
 }
+
