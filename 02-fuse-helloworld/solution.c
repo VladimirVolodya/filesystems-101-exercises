@@ -110,7 +110,7 @@ static int hello_write_buf(const char *path, struct fuse_bufvec *buf,
 
 static int hello_mkdir(const char *path, mode_t mode) {
     (void) path;
-    (void) mode_t;
+    (void) mode;
     return -EROFS;
 }
 
