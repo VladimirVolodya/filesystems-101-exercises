@@ -130,7 +130,7 @@ static const struct fuse_operations hellofs_ops = {
         .create = hello_create,
         .write_buf = hello_write_buf,
         .mkdir = hello_mkdir,
-        .mknod = hello_mkmod,
+        .mknod = hello_mknod,
 };
 
 int helloworld(const char *mntp) {
