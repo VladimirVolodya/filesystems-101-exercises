@@ -19,7 +19,7 @@ static int hello_getattr(const char* path, struct stat* st,
     } else if (!strcmp(path + 1, filename)) {
         st->st_mode = S_IFREG | 0444;
         st->st_nlink = 1;
-        st->st_size = strlen(content_format + 10);
+        st->st_size = strlen(content_format) + 10;
     } else {
         res = -ENOENT;
     }
