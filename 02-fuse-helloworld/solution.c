@@ -81,11 +81,22 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
         return size;
 }
 
+static int hello_write(fuse_req_t req, const char *buf, size_t size,
+                          off_t off, struct fuse_file_info *fi) {
+    (void) req;
+    (void) buf;
+    (void) size;
+    (void) off;
+    (void) fi;
+    return -EROFS;
+}
+
 static const struct fuse_operations hellofs_ops = {
 	    .getattr = hello_getattr,
         .readdir = hello_readdir,
         .open = hello_open,
         .read = hello_read,
+        .write = hello_write,
 };
 
 int helloworld(const char *mntp) {
