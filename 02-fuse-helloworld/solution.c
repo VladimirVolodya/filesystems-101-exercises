@@ -102,7 +102,7 @@ static int hello_create(const char *path, mode_t mode,
 static int hello_write_buf(const char *path, struct fuse_bufvec *buf,
                            off_t offset, struct fuse_file_info *fi) {
     (void) path;
-    (void) fuse_bufvec;
+    (void) buf;
     (void) offset;
     (void) fuse_file_info;
     return -EROFS;
