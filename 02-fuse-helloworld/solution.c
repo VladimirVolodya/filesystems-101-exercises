@@ -108,6 +108,19 @@ static int hello_write_buf(const char *path, struct fuse_bufvec *buf,
     return -EROFS;
 }
 
+static int hello_mkdir(const char *path, mode_t mode) {
+    (void) path;
+    (void) mode_t;
+    return -EROFS;
+}
+
+static int hello_mknod(const char *path, mode_t mode, dev_t rdev) {
+    (void) path;
+    (void) mode;
+    (void) rdev;
+    return -EROFS;
+}
+
 static const struct fuse_operations hellofs_ops = {
 	    .getattr = hello_getattr,
         .readdir = hello_readdir,
@@ -116,6 +129,8 @@ static const struct fuse_operations hellofs_ops = {
         .write = hello_write,
         .create = hello_create,
         .write_buf = hello_write_buf,
+        .mkdir = hello_mkdir,
+        .mknod = hello_mkmod,
 };
 
 int helloworld(const char *mntp) {
