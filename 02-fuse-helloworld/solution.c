@@ -104,7 +104,7 @@ static int hello_write_buf(const char *path, struct fuse_bufvec *buf,
     (void) path;
     (void) buf;
     (void) offset;
-    (void) fuse_file_info;
+    (void) fi;
     return -EROFS;
 }
 
