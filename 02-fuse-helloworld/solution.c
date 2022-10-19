@@ -81,7 +81,7 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
         return size;
 }
 
-static int hello_write(fuse_req_t req, const char *buf, size_t size,
+static int hello_write(const char* req, const char *buf, size_t size,
                           off_t off, struct fuse_file_info *fi) {
     (void) req;
     (void) buf;
