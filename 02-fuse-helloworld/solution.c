@@ -105,6 +105,7 @@ static const struct fuse_operations hellofs_ops = {
         .open = hello_open,
         .read = hello_read,
         .write = hello_write,
+        .create = hello_create,
 };
 
 int helloworld(const char *mntp) {
