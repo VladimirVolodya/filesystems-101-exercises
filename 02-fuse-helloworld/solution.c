@@ -19,7 +19,7 @@ static int hello_getattr(const char* path, struct stat* st,
     } else if (!strcmp(path + 1, filename)) {
         st->st_mode = S_IFREG | 0444;
         st->st_nlink = 1;
-        st->st_size = strlen(content_format + 8);
+        st->st_size = strlen(content_format + 10);
     } else {
         res = -ENOENT;
     }
@@ -33,7 +33,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         (void) fi;
         (void) flags;
  
-        if (strcmp(path, "/") != 0) {
+        if (strcmp(path, "/")) {
             return -ENOENT;
         } 
 
@@ -45,7 +45,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 static int hello_open(const char *path, struct fuse_file_info *fi) {
-        if (strcmp(path+1, filename)) {
+        if (strcmp(path + 1, filename)) {
             return -ENOENT;
         }
 
@@ -60,13 +60,13 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
                       struct fuse_file_info *fi) {
         long int len;
         (void) fi;
-        if(strcmp(path+1, filename)) {
+        if(strcmp(path + 1, filename)) {
             return -ENOENT;
         }
 
         struct fuse_context* context = fuse_get_context();
         char output[100];
-        sprintf(output, content_format, context->pid, '\0');
+        sprintf(output, content_format, context->pid);
         len = strlen(output);
 
         if (offset < len) {
