@@ -74,7 +74,7 @@ int schedule_max_writes(struct io_uring* p_ring, int in, int out,
     struct io_data* p_data;
     int ret = io_uring_wait_cqe(p_ring, &p_cqe);
     struct io_uring_sqe* p_sqe;
-    assert(p_sqe);
+    assert(p_cqe);
     int scheduled = 0;
     do {
         if (!(p_sqe = io_uring_get_sqe(p_ring))) {
