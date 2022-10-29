@@ -1,150 +1,220 @@
-#include <solution.h>
-#include <liburing.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
+#include <sys/ioctl.h>
+#include "liburing.h"
 
-typedef struct {
-    char* buf;
-    __u64 offset;
-    unsigned nbytes;
-    char read;
-} io_data;
+#define QD	4
+#define BS	(256 * 1024)
 
-
-void schedule_read(struct io_uring_sqe* p_sqe, int fd, io_data* p_data) {
-    op_info->read = 1;
-    io_uring_prep_read(p_sqe, fd, p_data->buf, p_data->nbytes, p_data->offset);
-    io_uring_sqe_set_data(p_sqe, p_data);
+struct io_data {
+	int read;
+	off_t first_offset, second_offset;
+	size_t size;
+	char* buf
 }
 
-void schedule_write(struct io_uring_sqe* p_sqe, int fd, io_data* p_data) {
-    op_info->read = 0;
-    io_uring_prep_write(p_sqe, fd, p_data->buf, p_data->nbytes, p_data->offset);
-    io_uring_sqe_set_data(p_sqe, p_data);
-}
-
-void reschedule(struct io_uring_sqe* p_sqe, int in, int out, io_data* p_data) {
-    if (p_data->read) {
-        io_uring_prep_read(p_sqe, in, p_data->buf, p_data->nbytes, p_data->offset);
-    } else {
-        io_uring_prep_write(p_sqe, out, p_data->buf, p_data->nbytes, p_data->offset);
-    }
-    io_uring_sqe_set_data(p_sqe, p_data);
-}
-
-int schedule_max_reads(struct io_uring* p_ring, int fd, unsigned* p_read_left,
-                       __u64* p_offset, const unsigned block_size,
-                       unsigned* p_scheduled_reads) {
-    unsigned buf_size = *p_read_left > block_size ? block_size : *p_read_left;
-    struct io_data* p_data = malloc(buf_size + sizeof(io_data));
-    struct io_uring_sqe* p_sqe;
-    unsigned reads = 0;
-    while (p_data && *p_left_read && p_sqe = io_uring_get_sqe(p_ring)) {
-        p_data->buf = p_data + sizeof(io_data);
-        p_data->nbytes = buf_size;
-        p_data->offset = *p_offset;
-        schedule_read(p_sqe, fd, p_data);
-        ++reads;
-        *p_read_left -= buf_size;
-        *offset += buf_size;
-        buf_size = *p_read_left > block_size ? block_size : *p_read_left;
-        p_data = malloc(buf_size + sizeof(io_data));
-    }
+int get_file_size(int fd, off_t* p_size) {
+	struct stat st;
     int ret;
-    if (reads && ret = io_uring_submit(p_ring)) {
-        return ret;
-    }
-    *p_scheduled_reads += reads;
-    if (p_data) {
-        free(p_data);
-    }
-    return 0;
-}
 
-int schedule_max_writes(struct io_uring* p_ring, int in, int out,
-                        unsigned* p_writes_left, unsigned* p_scheduled_reads,
-                        unsigned* p_scheduled_writes) {
-    if (!*p_writes_left) {
-        return 0;
+	if (fstat(fd, &st)) {
+		return -errno;
     }
-    struct io_uring_cqe* p_cqe;
-    struct io_data* p_data;
-    int ret = io_uring_wait_cqe(p_ring, &p_cqe);
-    struct io_uring_sqe* p_sqe;
-    assert(p_cqe);
-    int scheduled = 0;
-    do {
-        if (!(p_sqe = io_uring_get_sqe(p_ring))) {
-            break;
-        }
-        if (ret) {
-            return ret;
-        }
-        p_data = io_uring_cqe_get_data(p_cqe);
-        if (p_cqe->res < 0) {
-            if (p_cqe == -EAGAIN) {
-                reschedule(p_sqe, in, out, p_data);
-                ++scheduled;
-                io_uring_cqe_seen(p_ring, p_cqe);
-                continue;
-            }
-            return p_cqe->res;
-        } else if (p_cqe->res < p_data->nbytes) {
-            p_data->nbytes -= p_cqe->res;
-            p_data->offset += p_cqe->res;
-            memcpy(p_data->buf, p_data->buf + p_cqe->res, p_data->nbytes);
-            reschedule(p_sqe, in, out, p_data);
-            ++scheduled;
-            io_uring_cqe_seen(p_ring, p_cqe);
-            continue;
-        }
-        if (p_data->read) {
-            schedule_write(p_sqe, out, p_data);
-            ++scheduled;
-            ++(*p_scheduled_writes);
-            --(*p_scheduled_reads);
-            *p_writes_left -= p_data->nbytes;
-        } else {
-            free(p_data);
-            --(*p_scheduled_writes);
-        }
-        io_uring_cqe_seen(p_ring, p_cqe);
-    } while ((ret = io_uring_peek_cqe(p_ring, &p_cqe)) != -EAGAIN);
-    if (scheduled && ret = io_uring_submit(p_ring)) {
-        return ret;
-    }
-    return 0;
-}
 
-int copy(int in, int out) {
-    const unsigned int queue_size = 4;
-    const unsigned block_size = 256 * 1024;
-    struct io_uring ring;
-    int res;
-    if (res = io_uring_queue_init(queue_size, &ring, 0)) {
-        return res;
-    }
-    struct stat statbuf;
-    if (fstat(in, &statbuf)) {
-        return -errno;
-    }
-    unsigned write_left = statbuf.st_size;
-    unsigned read_left = statbuf.st_size;
-    __u64 offset = 0;
-    size_t scheduled_writes = 0;
-    size_t scheduled_reads = 0;
-    while (write_left || scheduled_writes) {
-        if (read_left && res = schedule_max_reads(p_ring, in, &read_left, &offset,
-                                     block_size, &scheduled_reads)) {
-            return res;
-        }
-        if (res = schedule_max_writes(p_ring, in, out, &writes_left,
-                                      &scheduled_reads, &scheduled_writes)) {
-            return res;
-        }
-    }
+    *p_size = st.st_size;
 	return 0;
 }
+
+void reschedule(struct io_uring* p_ring, struct io_data* p_data, int infd, int outfd,
+                off_t processed_len) {
+	struct io_uring_sqe* p_sqe;
+
+	p_sqe = io_uring_get_sqe(ring);
+	assert(p_sqe);
+    p_data->second_offset += processed_len;
+
+	if (p_data->read) {
+		io_uring_prep_read(p_sqe, infd, p_data->buf + p_data->second_offset,
+                           p_data->size - p_data->second_offset,
+                           p_data->first_offset + p_data->second_offset);
+	} else {
+		io_uring_prep_write(p_sqe, outfd, p_data->buf + p_data->second_offset,
+                            p_data->size - p_data->second_offset,
+                            p_data->first_offset + p_data->second_offset);
+    }
+
+	io_uring_sqe_set_data(p_sqe, p_data);
+    io_uring_submit(p_sqe);
+}
+
+int schedule_read(struct io_uring* p_ring, off_t size, off_t offset, int infd) {
+	struct io_uring_sqe *p_sqe;
+	struct io_data *p_data;
+
+	if (!(p_data = malloc(size + sizeof(io_data)))) {
+        return 1;
+    }
+
+	if (!(p_sqe = io_uring_get_sqe(p_ring))) {
+        free(p_data);
+        return 1;
+    }
+
+	p_data->read = 1;
+    p_data->first_offset = offset;
+    p_data->second_offset = 0;
+	p_data->buf = p_data + sizeof(io_data);
+	data->size = size;
+
+	io_uring_prep_read(p_sqe, infd, p_data->buf, size, offset);
+	io_uring_sqe_set_data(p_sqe, p_data);
+    io_uring_submit(p_ring);
+	return 0;
+}
+
+int schedule_write(struct io_uring* p_ring, struct io_data* p_data, int outfd) {
+	p_data->read = 0;
+	p_data->second_offset = 0;
+    
+    p_sqe = io_uring_get_sqe(p_ring);
+    assert(p_sqe);
+    
+	io_uring_prep_write(p_sqe, outfd, p_data->buf, p_data->size, p_data->first_offset);
+    io_uring_sqe_set_data(p_sqe, p_data);
+	io_uring_submit(p_ring);
+}
+
+static int copy(int in, int out) {
+	unsigned long reads, writes;
+	struct io_uring_cqe* p_cqe;
+    struct io_uring* p_ring;
+	off_t read_left, write_left, offset;
+	int ret;
+    
+    if (ret = io_uring_queue_init(QD, p_ring, 0)) {
+        return ret;
+    }
+
+    if (ret = get_file_size(in, &read_left)) {
+        return ret;
+    }
+
+    write_left = read_left;
+	writes = reads = offset = 0;
+
+	while (read_left || write_left) {
+		unsigned long had_reads;
+		int got_comp;
+	
+		/*
+		 * Queue up as many reads as we can
+		 */
+		before_reads = reads;
+		while (read_left) {
+			off_t cur_size = read_left;
+
+			if (reads + writes >= QD) {
+				break;
+            }
+			if (cur_size > BS) {
+				cur_size = BS;
+            } else if (!cur_size) {
+				break;
+            }
+
+			if (schedule_read(p_ring, cur_size, offset)) {
+				break;
+            }
+
+			insize -= this_size;
+			offset += this_size;
+			++reads;
+		}
+
+		if (before_reads != reads) {
+			if ((ret = io_uring_submit(p_ring)) < 0) {
+				return ret;
+			}
+		}
+
+		/*
+		 * Queue is full at this point. Find at least one completion.
+		 */
+		got_comp = 0;
+		while (write_left) {
+			struct io_data* p_data;
+
+			if (!got_comp) {
+				ret = io_uring_wait_cqe(p_ring, &p_cqe);
+				got_comp = 1;
+			} else {
+				(ret = io_uring_peek_cqe(p_ring, &p_cqe) == -EAGAIN) {
+					p_cqe = NULL;
+					ret = 0;
+				}
+			}
+			if (ret < 0) {
+				return ret;
+			}
+			if (!p_cqe)
+				break;
+
+			p_data = io_uring_cqe_get_data(p_cqe);
+			if (p_cqe->res < 0) {
+				if (cqe->res == -EAGAIN) {
+					reschedule(p_ring, p_data, in, out, 0);
+					io_uring_cqe_seen(ring, cqe);
+					continue;
+				}
+				return p_cqe->res;
+			} else if ((size_t) cqe->res != data->size) {
+				/* Short read/write, adjust and requeue */
+			    reschedule(p_ring, p_data, in, out, cqe->res);	
+				io_uring_cqe_seen(ring, cqe);
+				continue;
+			}
+
+			/*
+			 * All done. if write, nothing else to do. if read,
+			 * queue up corresponding write.
+			 */
+			if (data->read) {
+				sqchedule_write(p_ring, p_data, out);
+				write_left -= data->size;
+				--reads;
+				++writes;
+			} else {
+				free(data);
+				--writes;
+			}
+			io_uring_cqe_seen(ring, cqe);
+		}
+	}
+
+	/* wait out pending writes */
+    while (writes) {
+		struct io_data* p_data;
+
+		if (ret = io_uring_wait_cqe(ring, &p_cqe)) {
+			return ret;
+		}
+		if (p_cqe->res < 0) {
+			return p_cqe->res;
+		}
+		p_data = io_uring_cqe_get_data(p_cqe);
+		free(p_data);
+		--writes;
+		io_uring_cqe_seen(p_ring, p_cqe);
+	}
+
+	return 0;
+}
+
