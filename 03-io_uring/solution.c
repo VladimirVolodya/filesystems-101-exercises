@@ -91,7 +91,7 @@ void schedule_write(struct io_uring* p_ring, struct io_data* p_data, int outfd) 
 	io_uring_submit(p_ring);
 }
 
-static int copy(int in, int out) {
+int copy(int in, int out) {
 	unsigned long reads, writes;
 	struct io_uring_cqe* p_cqe;
     struct io_uring* p_ring;
@@ -110,7 +110,6 @@ static int copy(int in, int out) {
 	writes = reads = offset = 0;
 
 	while (read_left || write_left) {
-		unsigned long had_reads;
 		int got_comp;
 	
 		/*
@@ -202,7 +201,7 @@ static int copy(int in, int out) {
     while (writes) {
 		struct io_data* p_data;
 
-		if (ret = io_uring_wait_cqe(p_ring, &p_cqe)) {
+		if ((ret = io_uring_wait_cqe(p_ring, &p_cqe))) {
 			return ret;
 		}
 		if (p_cqe->res < 0) {
