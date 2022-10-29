@@ -155,7 +155,7 @@ static int copy(int in, int out) {
 				ret = io_uring_wait_cqe(p_ring, &p_cqe);
 				got_comp = 1;
 			} else {
-				((ret = io_uring_peek_cqe(p_ring, &p_cqe)) == -EAGAIN) {
+				if ((ret = io_uring_peek_cqe(p_ring, &p_cqe)) == -EAGAIN) {
 					p_cqe = NULL;
 					ret = 0;
 				}
