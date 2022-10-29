@@ -98,11 +98,11 @@ static int copy(int in, int out) {
 	off_t read_left, write_left, offset;
 	int ret;
     
-    if (ret = io_uring_queue_init(QD, p_ring, 0)) {
+    if ((ret = io_uring_queue_init(QD, p_ring, 0))) {
         return ret;
     }
 
-    if (ret = get_file_size(in, &read_left)) {
+    if ((ret = get_file_size(in, &read_left))) {
         return ret;
     }
 
@@ -116,7 +116,7 @@ static int copy(int in, int out) {
 		/*
 		 * Queue up as many reads as we can
 		 */
-		before_reads = reads;
+		unsigned long before_reads = reads;
 		while (read_left) {
 			off_t cur_size = read_left;
 
@@ -133,8 +133,8 @@ static int copy(int in, int out) {
 				break;
             }
 
-			insize -= this_size;
-			offset += this_size;
+			insize -= cur_size;
+			offset += cur_size;
 			++reads;
 		}
 
@@ -174,7 +174,7 @@ static int copy(int in, int out) {
 					continue;
 				}
 				return p_cqe->res;
-			} else if ((size_t) cqe->res != data->size) {
+			} else if ((size_t) p_cqe->res != p_data->size) {
 				/* Short read/write, adjust and requeue */
 			    reschedule(p_ring, p_data, in, out, cqe->res);	
 				io_uring_cqe_seen(p_ring, p_cqe);
@@ -185,13 +185,13 @@ static int copy(int in, int out) {
 			 * All done. if write, nothing else to do. if read,
 			 * queue up corresponding write.
 			 */
-			if (data->read) {
+			if (p_data->read) {
 				sqchedule_write(p_ring, p_data, out);
-				write_left -= data->size;
+				write_left -= p_data->size;
 				--reads;
 				++writes;
 			} else {
-				free(data);
+				free(p_data);
 				--writes;
 			}
 			io_uring_cqe_seen(p_ring, p_cqe);
