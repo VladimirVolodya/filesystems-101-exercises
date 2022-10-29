@@ -94,11 +94,11 @@ void schedule_write(struct io_uring* p_ring, struct io_data* p_data, int outfd) 
 int copy(int in, int out) {
 	unsigned long reads, writes;
 	struct io_uring_cqe* p_cqe;
-    struct io_uring* p_ring;
+    struct io_uring ring;
 	off_t read_left, write_left, offset;
 	int ret;
     
-    if ((ret = io_uring_queue_init(QD, p_ring, 0))) {
+    if ((ret = io_uring_queue_init(QD, &ring, 0))) {
         return ret;
     }
 
@@ -128,7 +128,7 @@ int copy(int in, int out) {
 				break;
             }
 
-			if (schedule_read(p_ring, cur_size, offset, in)) {
+			if (schedule_read(&ring, cur_size, offset, in)) {
 				break;
             }
 
@@ -138,7 +138,7 @@ int copy(int in, int out) {
 		}
 
 		if (before_reads != reads) {
-			if ((ret = io_uring_submit(p_ring)) < 0) {
+			if ((ret = io_uring_submit(&ring)) < 0) {
 				return ret;
 			}
 		}
@@ -151,10 +151,10 @@ int copy(int in, int out) {
 			struct io_data* p_data;
 
 			if (!got_comp) {
-				ret = io_uring_wait_cqe(p_ring, &p_cqe);
+				ret = io_uring_wait_cqe(&ring, &p_cqe);
 				got_comp = 1;
 			} else {
-				if ((ret = io_uring_peek_cqe(p_ring, &p_cqe)) == -EAGAIN) {
+				if ((ret = io_uring_peek_cqe(&ring, &p_cqe)) == -EAGAIN) {
 					p_cqe = NULL;
 					ret = 0;
 				}
@@ -168,15 +168,15 @@ int copy(int in, int out) {
 			p_data = io_uring_cqe_get_data(p_cqe);
 			if (p_cqe->res < 0) {
 				if (p_cqe->res == -EAGAIN) {
-					reschedule(p_ring, p_data, in, out, 0);
-					io_uring_cqe_seen(p_ring, p_cqe);
+					reschedule(&ring, p_data, in, out, 0);
+					io_uring_cqe_seen(&ring, p_cqe);
 					continue;
 				}
 				return p_cqe->res;
 			} else if ((size_t) p_cqe->res != p_data->size) {
 				/* Short read/write, adjust and requeue */
-			    reschedule(p_ring, p_data, in, out, p_cqe->res);	
-				io_uring_cqe_seen(p_ring, p_cqe);
+			    reschedule(&ring, p_data, in, out, p_cqe->res);	
+				io_uring_cqe_seen(&ring, p_cqe);
 				continue;
 			}
 
@@ -185,7 +185,7 @@ int copy(int in, int out) {
 			 * queue up corresponding write.
 			 */
 			if (p_data->read) {
-				schedule_write(p_ring, p_data, out);
+				schedule_write(&ring, p_data, out);
 				write_left -= p_data->size;
 				--reads;
 				++writes;
@@ -193,7 +193,7 @@ int copy(int in, int out) {
 				free(p_data);
 				--writes;
 			}
-			io_uring_cqe_seen(p_ring, p_cqe);
+			io_uring_cqe_seen(&ring, p_cqe);
 		}
 	}
 
@@ -201,7 +201,7 @@ int copy(int in, int out) {
     while (writes) {
 		struct io_data* p_data;
 
-		if ((ret = io_uring_wait_cqe(p_ring, &p_cqe))) {
+		if ((ret = io_uring_wait_cqe(&ring, &p_cqe))) {
 			return ret;
 		}
 		if (p_cqe->res < 0) {
@@ -210,7 +210,7 @@ int copy(int in, int out) {
 		p_data = io_uring_cqe_get_data(p_cqe);
 		free(p_data);
 		--writes;
-		io_uring_cqe_seen(p_ring, p_cqe);
+		io_uring_cqe_seen(&ring, p_cqe);
 	}
 
 	return 0;
