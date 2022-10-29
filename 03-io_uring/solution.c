@@ -18,12 +18,11 @@ struct io_data {
 	int read;
 	off_t first_offset, second_offset;
 	size_t size;
-	char* buf
-}
+	char* buf;
+};
 
 int get_file_size(int fd, off_t* p_size) {
 	struct stat st;
-    int ret;
 
 	if (fstat(fd, &st)) {
 		return -errno;
@@ -37,7 +36,7 @@ void reschedule(struct io_uring* p_ring, struct io_data* p_data, int infd, int o
                 off_t processed_len) {
 	struct io_uring_sqe* p_sqe;
 
-	p_sqe = io_uring_get_sqe(ring);
+	p_sqe = io_uring_get_sqe(p_ring);
 	assert(p_sqe);
     p_data->second_offset += processed_len;
 
@@ -52,14 +51,14 @@ void reschedule(struct io_uring* p_ring, struct io_data* p_data, int infd, int o
     }
 
 	io_uring_sqe_set_data(p_sqe, p_data);
-    io_uring_submit(p_sqe);
+    io_uring_submit(p_ring);
 }
 
 int schedule_read(struct io_uring* p_ring, off_t size, off_t offset, int infd) {
 	struct io_uring_sqe *p_sqe;
 	struct io_data *p_data;
 
-	if (!(p_data = malloc(size + sizeof(io_data)))) {
+	if (!(p_data = malloc(size + sizeof(struct io_data)))) {
         return 1;
     }
 
@@ -71,7 +70,7 @@ int schedule_read(struct io_uring* p_ring, off_t size, off_t offset, int infd) {
 	p_data->read = 1;
     p_data->first_offset = offset;
     p_data->second_offset = 0;
-	p_data->buf = p_data + sizeof(io_data);
+	p_data->buf = p_data + sizeof(struct io_data);
 	data->size = size;
 
 	io_uring_prep_read(p_sqe, infd, p_data->buf, size, offset);
