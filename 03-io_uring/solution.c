@@ -70,8 +70,8 @@ int schedule_read(struct io_uring* p_ring, off_t size, off_t offset, int infd) {
 	p_data->read = 1;
     p_data->first_offset = offset;
     p_data->second_offset = 0;
-	p_data->buf = p_data + sizeof(struct io_data);
-	data->size = size;
+	p_data->buf = (char*) p_data + sizeof(struct io_data);
+	p_data->size = size;
 
 	io_uring_prep_read(p_sqe, infd, p_data->buf, size, offset);
 	io_uring_sqe_set_data(p_sqe, p_data);
@@ -83,7 +83,7 @@ int schedule_write(struct io_uring* p_ring, struct io_data* p_data, int outfd) {
 	p_data->read = 0;
 	p_data->second_offset = 0;
     
-    p_sqe = io_uring_get_sqe(p_ring);
+    struct io_uring_sqe* p_sqe = io_uring_get_sqe(p_ring);
     assert(p_sqe);
     
 	io_uring_prep_write(p_sqe, outfd, p_data->buf, p_data->size, p_data->first_offset);
@@ -129,7 +129,7 @@ static int copy(int in, int out) {
 				break;
             }
 
-			if (schedule_read(p_ring, cur_size, offset)) {
+			if (schedule_read(p_ring, cur_size, offset, in)) {
 				break;
             }
 
@@ -168,16 +168,16 @@ static int copy(int in, int out) {
 
 			p_data = io_uring_cqe_get_data(p_cqe);
 			if (p_cqe->res < 0) {
-				if (cqe->res == -EAGAIN) {
+				if (p_cqe->res == -EAGAIN) {
 					reschedule(p_ring, p_data, in, out, 0);
-					io_uring_cqe_seen(ring, cqe);
+					io_uring_cqe_seen(p_ring, p_cqe);
 					continue;
 				}
 				return p_cqe->res;
 			} else if ((size_t) cqe->res != data->size) {
 				/* Short read/write, adjust and requeue */
 			    reschedule(p_ring, p_data, in, out, cqe->res);	
-				io_uring_cqe_seen(ring, cqe);
+				io_uring_cqe_seen(p_ring, p_cqe);
 				continue;
 			}
 
@@ -194,7 +194,7 @@ static int copy(int in, int out) {
 				free(data);
 				--writes;
 			}
-			io_uring_cqe_seen(ring, cqe);
+			io_uring_cqe_seen(p_ring, p_cqe);
 		}
 	}
 
