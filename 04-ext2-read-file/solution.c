@@ -17,17 +17,12 @@ int read_blk(int img, int out, int blk_idx, int blk_sz, int *left_read,
       return -errno;
     }
     unsigned ub = blk_sz / sizeof(int);
-    for (unsigned i = 0; i < ub; ++i) {
+    for (unsigned i = 0; i < ub && *left_read < 0; ++i) {
       if (read_blk(img, out, blk_idxs[i], blk_sz, left_read, level - 1) < 0) {
         free(buf);
         return -errno;
       }
-
-      if (*left_read < 0) {
-        break;
-      }
     }
-    free(buf);
   } else {
     int cur_len = *left_read > blk_sz ? blk_sz : *left_read;
     if (pread(img, buf, blk_sz, blk_idx * blk_sz) < 0) {
@@ -38,10 +33,9 @@ int read_blk(int img, int out, int blk_idx, int blk_sz, int *left_read,
       free(buf);
       return -errno;
     }
-    free(buf);
     *left_read -= cur_len;
-    return 0;
   }
+  free(buf);
   return 0;
 }
 
