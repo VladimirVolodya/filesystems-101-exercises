@@ -58,9 +58,9 @@ int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t* out_off,
         *out_off += cur_len;
     } else {
         int32_t* blk_idxs = (int32_t*) buf;
-        int64_t ub = blk_sz / sizeof(int32_t);
+        int32_t ub = blk_sz / sizeof(int32_t);
         int ret;
-        for (uint32_t i = 0; i < ub; ++i) {
+        for (int32_t i = 0; i < ub; ++i) {
             if (!blk_idxs[i]) {
                 break;
             }
