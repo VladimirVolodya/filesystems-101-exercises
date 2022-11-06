@@ -32,7 +32,7 @@ int read_inode(int img, struct ext2_super_block* p_sb, struct ext2_group_desc* p
     int64_t blk_sz = DEFBLKSZ << p_sb->s_log_block_size;
     int32_t inode_idx = (inode_nr - 1) % p_sb->s_inodes_per_group;
     off_t inode_off = blk_sz * p_gd->bg_inode_table + inode_idx * p_sb->s_inode_size;
-    if (pread(img, p_inode, sizeof(struct ext2_inode), inode_off)) {
+    if (pread(img, p_inode, sizeof(struct ext2_inode), inode_off) == -1) {
         return -errno;
     }
     return 0;
