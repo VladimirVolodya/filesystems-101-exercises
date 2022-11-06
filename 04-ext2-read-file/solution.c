@@ -37,7 +37,7 @@ int read_inode(int img, struct ext2_super_block* p_sb, struct ext2_group_desc* p
     return 0;
 }
 
-int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, off_t* file_offset, int64_t* left_read, int level) {
+int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, int64_t* left_read, int level) {
     if (!*left_read) {
         return 0;
     }
@@ -49,17 +49,16 @@ int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, off_t* file_offs
         return -errno;
     }
     if (!level) {
-        if ((ret = pwrite(out, buf, cur_len, *file_offset)) < 0) {
+        if (write(out, buf, cur_len) < cur_len) {
             free(buf);
             return -errno;
         }
-        *file_offset += ret;
-        *left_read -= ret;
+        *left_read -= cur_len;
     } else {
         int32_t* blk_idxs = (int32_t*) buf;
         int64_t ub = blk_sz / sizeof(int32_t);
         for (int64_t i = 0; i < ub; ++i) {
-            if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, file_offset, left_read, level - 1)) || *left_read < 0) {
+            if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, left_read, level - 1)) || *left_read < 0) {
                 free(buf);
                 return ret;
             }
@@ -88,16 +87,15 @@ int dump_file(int img, int inode_nr, int out) {
     }
     
     int64_t left_read = inode.i_size;
-    int64_t offset = 0;
     for (int i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
-        if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, &offset, &left_read, 0))) {
+        if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, &left_read, 0))) {
             return ret;
         }
     }
-    if ((ret = read_blk(img, out, inode.i_block[EXT2_IND_BLOCK], blk_sz, &offset, &left_read, 0))) {
+    if ((ret = read_blk(img, out, inode.i_block[EXT2_IND_BLOCK], blk_sz, &left_read, 0))) {
         return ret;
     }
-    if ((ret = read_blk(img, out, inode.i_block[EXT2_DIND_BLOCK], blk_sz, &offset, &left_read, 0))) {
+    if ((ret = read_blk(img, out, inode.i_block[EXT2_DIND_BLOCK], blk_sz, &left_read, 0))) {
         return ret;
     }
     return 0;
