@@ -45,7 +45,7 @@ int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t* out_off,
     }
     char* buf = malloc(blk_sz * sizeof(char));
     int64_t cur_len = *left_read > blk_sz ? blk_sz : *left_read;
-    if (pread(img, buf, cur_len, blk_idx * blk_sz) == -1) {
+    if (pread(img, buf, blk_sz, blk_idx * blk_sz) == -1) {
         free(buf);
         return -errno;
     }
