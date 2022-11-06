@@ -38,7 +38,7 @@ int read_inode(int img, struct ext2_super_block* p_sb, struct ext2_group_desc* p
     return 0;
 }
 
-int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t size,
+int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t* out_off,
              int64_t* left_read, int level) {
     if (!*left_read) {
         return 0;
@@ -50,11 +50,12 @@ int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t size,
         return -errno;
     }
     if (!level) {
-        if (pwrite(out, buf, cur_len, size - *left_read) == -1) {
+        if (pwrite(out, buf, cur_len, *out_off) == -1) {
             free(buf);
             return -errno;
         }
         *left_read -= cur_len;
+        *out_off += cur_len;
     } else {
         int32_t* blk_idxs = (int32_t*) buf;
         int64_t ub = blk_sz / sizeof(int32_t);
@@ -90,16 +91,17 @@ int dump_file(int img, int inode_nr, int out) {
     }
 
     int64_t left_read = inode.i_size;
+    int64_t out_off = 0;
     int64_t blk_sz = DEFBLKSZ << sb.s_log_block_size;
     for (int i = 0; i < INDBLK; ++i) {
-        if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, inode.i_size, &left_read, 0))) {
+        if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, &out_off, &left_read, 0))) {
             return ret;
         }
     }
-    if ((ret = read_blk(img, out, inode.i_block[INDBLK], blk_sz, inode.i_size, &left_read, 1))) {
+    if ((ret = read_blk(img, out, inode.i_block[INDBLK], blk_sz, out_off, &left_read, 1))) {
         return ret;
     }
-    if ((ret = read_blk(img, out, inode.i_block[DINDBLK], blk_sz, inode.i_size, &left_read, 2))) {
+    if ((ret = read_blk(img, out, inode.i_block[DINDBLK], blk_sz, out_off, &left_read, 2))) {
         return ret;
     }
 
