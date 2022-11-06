@@ -44,7 +44,7 @@ int dump_file(int img, int inode_nr, int out) {
   struct ext2_group_desc gd;
   struct ext2_inode inode;
 
-  if (pread(img, &sb, sizeof(sb), SBOFF) < 0) {
+  if (pread(img, &sb, sizeof(struct ext2_super_block), SBOFF) < 0) {
     return -errno;
   }
   int blk_sz = DEFBLKSZ << sb.s_log_block_size;
@@ -59,7 +59,7 @@ int dump_file(int img, int inode_nr, int out) {
   if (pread(img, &gd, sizeof(struct ext2_group_desc), gd_offset) < 0) {
     return -errno;
   }
-  if (pread(img, &inode, sizeof(inode), inode_offset) < 0) {
+  if (pread(img, &inode, sizeof(struct ext2_inode), inode_offset) < 0) {
     return -errno;
   }
 
