@@ -7,11 +7,12 @@
 #define DEFBLKSZ 1024
 #define SBOFF 1024
 
-int read_all(int fd, char* buf, int64_t len, off_t offset) {
+int read_all(int fd, void* buf, int64_t len, off_t offset) {
+  char* c_buf = (char*)buf;
   int64_t read = 0;
   int ret;
   while (len) {
-    if ((ret = pread(fd, buf + read, len, offset + read)) < 0) {
+    if ((ret = pread(fd, c_buf + read, len, offset + read)) < 0) {
       return -errno;
     }
     len -= ret;
@@ -20,11 +21,12 @@ int read_all(int fd, char* buf, int64_t len, off_t offset) {
   return 0;
 }
 
-int write_all(int fd, const char* buf, int64_t len, off_t offset) {
+int write_all(int fd, const void* buf, int64_t len, off_t offset) {
+  const char* c_buf = (const char*)buf;
   int64_t wrote = 0;
   int ret;
   while (len) {
-    if ((ret = pwrite(fd, buf + wrote, len, offset + wrote)) < 0) {
+    if ((ret = pwrite(fd, c_buf + wrote, len, offset + wrote)) < 0) {
       return -errno;
     }
     len -= ret;
