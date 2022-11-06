@@ -13,7 +13,7 @@ int block_size(struct ext2_super_block* super) {
 }
 
 int read_sb(int img, struct ext2_super_block* p_sb) {
-    if (pread(img, p_sb, sizeof(struct ext2_super_block), SBOFF) == -1) {
+    if (pread(img, p_sb, sizeof(struct ext2_super_block), SBOFF) < 0) {
         return -errno;
     }
     return 0;
@@ -22,7 +22,7 @@ int read_sb(int img, struct ext2_super_block* p_sb) {
 int read_gd(int img, struct ext2_super_block* p_sb, struct ext2_group_desc* p_gd, int64_t blk_sz, int inode_nr) {
     int64_t gd_idx = (inode_nr - 1)/ p_sb->s_inodes_per_group;
     off_t offset = blk_sz * (p_sb->s_first_data_block + 1) + gd_idx * sizeof(struct ext2_group_desc);
-    if (pread(img, p_gd, sizeof(struct ext2_group_desc), offset) == -1) {
+    if (pread(img, p_gd, sizeof(struct ext2_group_desc), offset) < 0) {
         return -errno;
     }
     return 0;
@@ -44,12 +44,12 @@ int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, off_t* file_offs
     char* buf = malloc(blk_sz);
     int64_t cur_len = *left_read > blk_sz ? blk_sz : *left_read;
     int ret;
-    if (pread(img, buf, blk_sz, blk_idx * blk_sz) == -1) {
+    if (pread(img, buf, blk_sz, blk_idx * blk_sz) < 0) {
         free(buf);
         return -errno;
     }
     if (!level) {
-        if ((ret = pwrite(out, buf, cur_len, *file_offset)) == -1) {
+        if (pwrite(out, buf, cur_len, *file_offset) < 0) {
             free(buf);
             return -errno;
         }
