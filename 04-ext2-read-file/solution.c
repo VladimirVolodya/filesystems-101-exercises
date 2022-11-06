@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <ext2fs/ext2fs.h>
 
 #include "solution.h"
 
@@ -31,7 +32,7 @@ int read_inode(int img, struct ext2_super_block* p_sb, struct ext2_group_desc* p
     int64_t blk_sz = DEFBLKSZ << p_sb->s_log_block_size;
     int32_t inode_idx = (inode_nr - 1) % p_sb->s_inodes_per_group;
     off_t inode_off = blk_sz * p_gd->bg_inode_table + inode_idx * p_sb->s_inode_size;
-    if (pread(img, p_inode, sizeof(struct ext2_inode)), inode_off) {
+    if (pread(img, p_inode, sizeof(struct ext2_inode), inode_off)) {
         return -errno;
     }
     return 0;
@@ -43,19 +44,19 @@ int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t size,
         return 0;
     }
     char* buf = malloc(blk_sz * sizeof(char));
-    int64_t cur_len = left_read > blk_sz ? blk_sz : left_read;
-    if (pread(img, buf, cur_len, blk_idx * blk_size) == -1) {
+    int64_t cur_len = *left_read > blk_sz ? blk_sz : *left_read;
+    if (pread(img, buf, cur_len, blk_idx * blk_sz) == -1) {
         free(buf);
         return -errno;
     }
     if (!level) {
-        if (pwrite(, buf, cur_len, size - *left_read) == -1) {
+        if (pwrite(out, buf, cur_len, size - *left_read) == -1) {
             free(buf);
             return -errno;
         }
         *left_read -= cur_len;
     } else {
-        int32_t* blk_idxs = (int32_t)
+        int32_t* blk_idxs = (int32_t*) buf;
         int64_t ub = blk_sz / sizeof(int32_t);
         int ret;
         for (uint32_t i = 0; i < ub; ++i) {
@@ -88,16 +89,17 @@ int dump_file(int img, int inode_nr, int out) {
         return ret;
     }
 
-    int64_t left_read = (((int64_t) inode->i_dir_acl) << 32) + inode->i_size;
+    int64_t left_read = inode.i_size;
+    int64_t blk_sz = DEFBLKSZ << sb.s_log_block_size;
     for (int i = 0; i < INDBLK; ++i) {
-        if ((ret = read_blk(img, out, inode.i_block[i], blk_size, &left_read, 0))) {
+        if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, inode.i_size, &left_read, 0))) {
             return ret;
         }
     }
-    if ((ret = read_blk(img, out, inode,i_block[INDBLK], blk_size, &left_read, 1))) {
+    if ((ret = read_blk(img, out, inode.i_block[INDBLK], blk_sz, inode.i_size, &left_read, 1))) {
         return ret;
     }
-    if ((ret = read_blk(img, out, inode.i)block[DINDBLK], blk_size, &left_read, 2)) {
+    if ((ret = read_blk(img, out, inode.i_block[DINDBLK], blk_sz, inode.i_size, &left_read, 2))) {
         return ret;
     }
 
