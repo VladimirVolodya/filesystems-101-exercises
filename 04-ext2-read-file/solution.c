@@ -49,7 +49,7 @@ int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, off_t* file_offs
         return -errno;
     }
     if (!level) {
-        if (pwrite(out, buf, cur_len, *file_offset) < 0) {
+        if ((ret = pwrite(out, buf, cur_len, *file_offset)) < 0) {
             free(buf);
             return -errno;
         }
