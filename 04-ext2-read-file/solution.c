@@ -58,6 +58,9 @@ int read_blk(int img, int out, int64_t blk_idx, int64_t blk_sz, int64_t* left_re
         int32_t* blk_idxs = (int32_t*) buf;
         int64_t ub = blk_sz / sizeof(int32_t);
         for (int64_t i = 0; i < ub; ++i) {
+            if (!blk_idxs[i]) {
+                break;
+            }
             if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, left_read, level - 1)) || *left_read < 0) {
                 free(buf);
                 return ret;
