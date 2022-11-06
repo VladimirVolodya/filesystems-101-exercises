@@ -64,7 +64,7 @@ int read_blk(int img, int out, off_t blk_idx, int64_t blk_sz, int64_t* out_off,
             if (!blk_idxs[i]) {
                 break;
             }
-            if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, size, left_read, level - 1))) {
+            if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, out_off, left_read, level - 1))) {
                 free(buf);
                 return ret;
             }
@@ -98,10 +98,10 @@ int dump_file(int img, int inode_nr, int out) {
             return ret;
         }
     }
-    if ((ret = read_blk(img, out, inode.i_block[INDBLK], blk_sz, out_off, &left_read, 1))) {
+    if ((ret = read_blk(img, out, inode.i_block[INDBLK], blk_sz, &out_off, &left_read, 1))) {
         return ret;
     }
-    if ((ret = read_blk(img, out, inode.i_block[DINDBLK], blk_sz, out_off, &left_read, 2))) {
+    if ((ret = read_blk(img, out, inode.i_block[DINDBLK], blk_sz, &out_off, &left_read, 2))) {
         return ret;
     }
 
