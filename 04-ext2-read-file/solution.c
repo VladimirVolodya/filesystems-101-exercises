@@ -1,70 +1,46 @@
 #include <errno.h>
 #include <ext2fs/ext2fs.h>
 #include <solution.h>
-#include <sys/sendfile.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#define DEFBLKSZ 1024
 #define SBOFF 1024
+#define DEFBLKSZ 1024
 
-int read_sb(int img, struct ext2_super_block* p_sb) {
-  if (pread(img, p_sb, sizeof(struct ext2_super_block), SBOFF) == -1) {
-    return -errno;
-  }
-  return 0;
-}
-
-int read_gd(int img, struct ext2_super_block* p_sb,
-            struct ext2_group_desc* p_gd, int blk_sz, int inode_nr) {
-  int gd_idx = (inode_nr - 1) / p_sb->s_inodes_per_group;
-  off_t gd_offset = blk_sz * (p_sb->s_first_data_block + 1) +
-                    gd_idx * sizeof(struct ext2_group_desc);
-  if (pread(img, p_gd, sizeof(struct ext2_group_desc), gd_offset) == -1) {
-    return -errno;
-  }
-  return 0;
-}
-
-int read_inode(int img, struct ext2_super_block* p_sb,
-               struct ext2_group_desc* p_gd, struct ext2_inode* p_inode,
-               int blk_sz, int inode_nr) {
-  int inode_idx = (inode_nr - 1) % p_sb->s_inodes_per_group;
-  off_t inode_offset =
-      blk_sz * p_gd->bg_inode_table + p_sb->s_inode_size * inode_idx;
-  if (pread(img, p_inode, sizeof(struct ext2_inode), inode_offset) == -1) {
-    return -errno;
-  }
-  return 0;
-}
-
-int read_blk(int img, int out, int blk_idx, int blk_sz, int* p_read_left,
+int read_blk(int img, int out, int blk_idx, int blk_sz, int *left_read,
              int level) {
-  int ret;
+  char *buf = malloc(blk_sz);
   if (level) {
-    int ub = blk_sz / sizeof(int);
-    int* blk_idxs = malloc(blk_sz);
-    if (pread(img, blk_idxs, blk_sz, blk_sz * blk_idx) == -1) {
-      free(blk_idxs);
+    int *blk_idxs = (int *)buf;
+    if (pread(img, buf, blk_sz, blk_idx * blk_sz) < 0) {
+      free(buf);
       return -errno;
     }
-    for (int i = 0; i < ub; i++) {
-      if (!blk_idxs[i]) {
+    unsigned ub = blk_sz / sizeof(int);
+    for (unsigned i = 0; i < ub; ++i) {
+      if (read_blk(img, out, blk_idxs[i], blk_sz, left_read, level - 1) < 0) {
+        free(buf);
+        return -errno;
+      }
+
+      if (*left_read < 0) {
         break;
       }
-      if ((ret = read_blk(img, out, blk_idxs[i], blk_sz, p_read_left,
-                          level - 1))) {
-        return ret;
-      }
     }
-    free(blk_idxs);
+    free(buf);
   } else {
-    int cur_len = *p_read_left > blk_sz ? blk_sz : *p_read_left;
-    p_read_left -= cur_len;
-    off_t offset = blk_sz * blk_idx;
-
-    if (sendfile(out, img, &offset, cur_len) == -1) {
+    int cur_len = *left_read > blk_sz ? blk_sz : *left_read;
+    if (pread(img, buf, blk_sz, blk_idx * blk_sz) < 0) {
+      free(buf);
       return -errno;
     }
+    if (write(out, buf, cur_len) < cur_len) {
+      free(buf);
+      return -errno;
+    }
+    free(buf);
+    *left_read -= cur_len;
+    return 0;
   }
   return 0;
 }
@@ -73,35 +49,39 @@ int dump_file(int img, int inode_nr, int out) {
   struct ext2_super_block sb;
   struct ext2_group_desc gd;
   struct ext2_inode inode;
-  int ret;
 
-  if ((ret = read_sb(img, &sb))) {
-    return ret;
+  if (pread(img, &sb, sizeof(sb), SBOFF) < 0) {
+    return -errno;
   }
   int blk_sz = DEFBLKSZ << sb.s_log_block_size;
 
-  if ((ret = read_gd(img, &sb, &gd, blk_sz, inode_nr))) {
-    return ret;
+  off_t gd_idx = (inode_nr - 1) / sb.s_inodes_per_group;
+  off_t gd_offset = blk_sz * (sb.s_first_data_block + 1) +
+                    gd_idx * sizeof(struct ext2_group_desc);
+  off_t inode_idx = (inode_nr - 1) % sb.s_inodes_per_group;
+  off_t inode_offset =
+      gd.bg_inode_table * blk_sz + (inode_idx * sb.s_inode_size);
+
+  if (pread(img, &gd, sizeof(struct ext2_group_desc), gd_offset) < 0) {
+    return -errno;
+  }
+  if (pread(img, &inode, sizeof(inode), inode_offset) < 0) {
+    return -errno;
   }
 
-  if ((ret = read_inode(img, &sb, &gd, &inode, blk_sz, inode_nr))) {
-    return ret;
-  }
-
-  int read_left = inode.i_size;
-  for (int i = 0; i < EXT2_NDIR_BLOCKS; i++) {
-    if ((ret = read_blk(img, out, inode.i_block[i], blk_sz, &read_left, 0))) {
-      return ret;
+  int left_read = inode.i_size;
+  for (int i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
+    if (read_blk(img, out, inode.i_block[i], blk_sz, &left_read, 0) < 0) {
+      return -errno;
     }
   }
-  if ((ret = read_blk(img, out, inode.i_block[EXT2_IND_BLOCK], blk_sz,
-                      &read_left, 1))) {
-    return ret;
+  if (read_blk(img, out, inode.i_block[EXT2_IND_BLOCK], blk_sz, &left_read,
+               1)) {
+    return -errno;
   }
-  if ((ret = read_blk(img, out, inode.i_block[EXT2_DIND_BLOCK], blk_sz,
-                      &read_left, 2))) {
-    return ret;
+  if (read_blk(img, out, inode.i_block[EXT2_DIND_BLOCK], blk_sz, &left_read,
+               2)) {
+    return -errno;
   }
-
   return 0;
 }
