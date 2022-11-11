@@ -154,31 +154,26 @@ int64_t send_didir_blks(int img, int out, struct ext2_inode* p_inode,
   if (pread(img, blk_didxs, blk_sz,
             p_inode->i_block[EXT2_DIND_BLOCK] * blk_sz) < 0) {
     free(blk_idxs);
-    free(blk_didxs);
     return -errno;
   }
   for (size_t i = 0; i < ub; ++i) {
     if (pread(img, blk_idxs, blk_sz, blk_didxs[i] * blk_sz) < 0) {
       free(blk_idxs);
-      free(blk_didxs);
       return -errno;
     }
     for (size_t j = 0; j < ub; ++j) {
       to_send = left_read > blk_sz ? blk_sz : left_read;
       if ((res = send_blk(img, out, blk_idxs[i], blk_sz, to_send)) < 0) {
         free(blk_idxs);
-        free(blk_didxs);
         return res;
       }
       if ((sent += to_send) > left_read) {
         free(blk_idxs);
-        free(blk_didxs);
         return sent;
       }
     }
   }
   free(blk_idxs);
-  free(blk_didxs);
   return sent;
 }
 
