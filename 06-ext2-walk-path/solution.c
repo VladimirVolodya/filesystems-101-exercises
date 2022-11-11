@@ -39,7 +39,7 @@ int64_t search_inode(int img, struct ext2_super_block* p_sb, uint32_t inode_nr,
 int dump_file(int img, const char* path, int out) {
   int64_t res = 0;
   struct ext2_super_block sb;
-  if ((res = read_sb(&sb, img)) < 0) {
+  if ((res = read_sb(img, &sb)) < 0) {
     return (int)res;
   }
   uint32_t blk_sz = EXT2_BLOCK_SIZE(&sb);
@@ -80,7 +80,7 @@ int read_inode(int img, struct ext2_super_block* p_sb,
     return res;
   }
   off_t inode_offset =
-      gd.bg_inode_table * blk_sz + inode_nr * p_sb->s_inode_size;
+      gd.bg_inode_table * blk_sz + inode_idx * p_sb->s_inode_size;
   if (pread(img, p_inode, sizeof(struct ext2_inode), inode_offset) < 0) {
     return -errno;
   }
@@ -261,14 +261,14 @@ int64_t search_inode_in_iblk(int img, struct ext2_super_block* p_sb,
   int64_t res = 0;
   size_t ub = blk_sz / sizeof(uint32_t);
   if ((res = pread(img, blk_idxs, blk_sz, blk_sz * blk_idx)) < 0) {
-    free(blk_idx);
+    free(blk_idxs);
     return -errno;
   }
   for (size_t i = 0; i < ub; ++i) {
     if (!blk_idxs[i]) {
       return -ENOENT;
     }
-    if ((res = search_inode_in_dblk(img, blk_idxs[i], p_sb, path, blk_sz))) {
+    if ((res = search_inode_in_dblk(img, p_sb, blk_idxs[i], path, blk_sz))) {
       free(blk_idxs);
       return res;
     }
@@ -291,7 +291,7 @@ int64_t search_inode_in_diblk(int img, struct ext2_super_block* p_sb,
     if (!blk_didxs[i]) {
       return -ENOENT;
     }
-    if ((res = search_inode_in_idblk(img, p_sb, blk_didxs[i], path, blk_sz))) {
+    if ((res = search_inode_in_iblk(img, p_sb, blk_didxs[i], path, blk_sz))) {
       free(blk_didxs);
       return res;
     }
