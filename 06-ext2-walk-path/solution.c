@@ -128,6 +128,7 @@ int64_t send_idir_blks(int img, int out, struct ext2_inode* p_inode,
   uint32_t* blk_idxs = malloc(blk_sz);
   if (pread(img, blk_idxs, blk_sz, p_inode->i_block[EXT2_IND_BLOCK] * blk_sz) <
       0) {
+    free(blk_idxs);
     return -errno;
   }
   for (size_t i = 0; i < ub; ++i) {
@@ -137,9 +138,11 @@ int64_t send_idir_blks(int img, int out, struct ext2_inode* p_inode,
       return res;
     }
     if ((sent += to_send) >= left_read) {
+      free(blk_idxs);
       return sent;
     }
   }
+  free(blk_idxs);
   return sent;
 }
 
