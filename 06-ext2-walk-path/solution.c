@@ -143,7 +143,7 @@ int send_didir_blk(int img, int out, struct ext2_inode* p_inode,
   size_t to_send = 0;
   size_t ub = blk_sz / sizeof(uint32_t);
   uint32_t* dind_blk = malloc(2 * blk_sz);
-  uint32_t* ind_blk = dind_blk + blk_sz;
+  uint32_t* ind_blk = dind_blk + ub;
   if ((res = pread(img, dind_blk, blk_sz,
                    p_inode->i_block[EXT2_DIND_BLOCK] * blk_sz)) < 0) {
     free(dind_blk);
