@@ -31,12 +31,12 @@ int64_t search_inode(int img, struct ext2_super_block* p_sb, long inode_nr,
                      const char* path);
 
 int dump_file(int img, const char* path, int out) {
-  long res;
+  int res = 0;
   struct ext2_super_block sb;
   if ((res = read_sb(img, &sb)) < 0) {
     return res;
   }
-  if ((res = search_inode(img, &sb, 2, path)) < 0) {
+  if ((res = (int)search_inode(img, &sb, 2, path)) < 0) {
     return res;
   }
   if ((res = send_file(img, out, &sb, res)) < 0) {
@@ -54,11 +54,11 @@ int read_sb(int img, struct ext2_super_block* sb) {
 
 int read_gd(int img, struct ext2_super_block* sb, struct ext2_group_desc* bg,
             size_t inode_nr) {
-  size_t bg_number = (inode_nr - 1) / sb->s_inodes_per_group;
+  size_t gd_idx = (inode_nr - 1) / sb->s_inodes_per_group;
   size_t block_size = EXT2_BLOCK_SIZE(sb);
-  if (pread(img, bg, sizeof(struct ext2_group_desc),
-            (sb->s_first_data_block + 1) * block_size +
-                sizeof(struct ext2_group_desc) * bg_number) < 0) {
+  size_t gd_offset = (sb->s_first_data_block + 1) * block_size +
+                     sizeof(struct ext2_group_desc) * gd_idx;
+  if (pread(img, bg, sizeof(struct ext2_group_desc), gd_offset) < 0) {
     return -errno;
   }
   return 0;
@@ -68,12 +68,12 @@ int read_inode(int img, struct ext2_super_block* p_sb,
                struct ext2_inode* p_inode, long inode_nr) {
   struct ext2_group_desc gd;
   int res = 0;
+  size_t inode_idx = (inode_nr - 1) % p_sb->s_inodes_per_group;
   if ((res = read_gd(img, p_sb, &gd, inode_nr)) < 0) {
     return res;
   }
-  long inode_idx = (inode_nr - 1) % p_sb->s_inodes_per_group;
-  off_t inode_offset = gd.bg_inode_table * EXT2_BLOCK_SIZE(p_sb) +
-                       inode_idx * p_sb->s_inode_size;
+  size_t inode_offset = gd.bg_inode_table * EXT2_BLOCK_SIZE(p_sb) +
+                        inode_idx * p_sb->s_inode_size;
   if (pread(img, p_inode, sizeof(struct ext2_inode), inode_offset)) {
     return -errno;
   }
@@ -195,36 +195,37 @@ int search_inode_dir(int img, struct ext2_super_block* p_sb, uint32_t blk_idx,
   if (blk_idx == 0) {
     return -ENOENT;
   }
-  const int blk_sz = EXT2_BLOCK_SIZE(p_sb);
+  int32_t blk_sz = EXT2_BLOCK_SIZE(p_sb);
   char* buf = malloc(blk_sz);
+  char* cur = buf;
   if (pread(img, buf, blk_sz, blk_idx * blk_sz) < 0) {
     free(buf);
     return -errno;
   }
-  struct ext2_dir_entry_2* p_de = (struct ext2_dir_entry_2*)buf;
-  while ((char*)p_de - buf < blk_sz) {
+  while (cur - buf < blk_sz) {
+    struct ext2_dir_entry_2* p_de = (struct ext2_dir_entry_2*)cur;
     if (p_de->inode == 0) {
       return -ENOENT;
     }
-    const char* next_dir = strchr(path, '/');
-    if (next_dir == NULL) {
-      next_dir = path + strlen(path);
+    const char* next_dir = path;
+    while (*next_dir && *next_dir != '/') {
+      ++next_dir;
     }
     if (next_dir - path == p_de->name_len &&
         !strncmp(path, p_de->name, p_de->name_len)) {
       long inode_nr = p_de->inode;
       if (next_dir[0] != '/') {
         free(buf);
-        return inode_nr;
+        return (int)inode_nr;
       }
       if (p_de->file_type == EXT2_FT_DIR) {
         free(buf);
-        return search_inode(img, p_sb, inode_nr, next_dir);
+        return (int)search_inode(img, p_sb, inode_nr, next_dir);
       }
       free(buf);
       return -ENOTDIR;
     }
-    p_de = (struct ext2_dir_entry_2*)((char*)p_de + p_de->rec_len);
+    cur += p_de->rec_len;
   }
   free(buf);
   return 0;
