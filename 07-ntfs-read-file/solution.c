@@ -221,10 +221,11 @@ ntfs_inode *ntfs_pathname_to_inode_enotdir(ntfs_volume *vol, ntfs_inode *parent,
     unicode = NULL;
 
     if (q) {
+      if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+        err = ENOTDIR;
+        goto close;
+      }
       *q++ = PATH_SEP; /* JPA */
-    } else if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
-      err = ENOTDIR;
-      goto close;
     }
     p = q;
     while (p && *p && *p == PATH_SEP) p++;
