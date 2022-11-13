@@ -49,18 +49,18 @@ int dump_file(int img, const char *path, int out) {
           0) {
     ntfs_attr_close(p_ntfs_attr);
     ntfs_inode_close(p_ntfs_inode);
-    unmount(p_ntfs_attr);
+    unmount(p_ntfs_volume);
     return res;
   }
   if ((res = ntfs_read(p_ntfs_attr, out, blk_sz)) < 0) {
     ntfs_attr_close(p_ntfs_attr);
     ntfs_inode_close(p_ntfs_inode);
-    unmount(p_ntfs_attr);
+    unmount(p_ntfs_volume);
     return res;
   }
   ntfs_attr_close(p_ntfs_attr);
   ntfs_inode_close(p_ntfs_inode);
-  return unmount(p_ntfs_attr);
+  return unmount(p_ntfs_volume);
 }
 
 int fd_to_path(int fd, char *out) {
@@ -121,7 +121,7 @@ int ntfs_read_mst(ntfs_attr *p_ntfs_attr, int out, u32 blk_sz) {
       return 0;
     }
     read_bytes = read_blks * blk_sz;
-    if (write(out, buf, read_bytes < read_bytes)) {
+    if (write(out, buf, read_bytes) < read_bytes) {
       free(buf);
       return -errno;
     }
