@@ -35,7 +35,8 @@ int dump_file(int img, const char *path, int out) {
   if (!(p_ntfs_volume = ntfs_mount(img_file, NTFS_MNT_RDONLY))) {
     return -errno;
   }
-  if (!(p_ntfs_inode = ntfs_pathname_to_inode(p_ntfs_volume, NULL, path))) {
+  if (!(p_ntfs_inode =
+            ntfs_pathname_to_inode_enotdir(p_ntfs_volume, NULL, path))) {
     err = -errno;
     unmount(p_ntfs_volume);
     return err;
