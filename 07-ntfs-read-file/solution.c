@@ -1,15 +1,16 @@
 #include <errno.h>
 #include <limits.h>
 #include <linux/limits.h>
-#include <ntfs-3g/attrib.h>
-#include <ntfs-3g/dir.h>
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/volume.h>
 #include <solution.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#define _STRUCT_TIMESPEC 1
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/dir.h>
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/volume.h>
 
 int fd_to_path(int fd, char *out);
 int unmount(ntfs_volume *p_ntfs_volume);
@@ -21,12 +22,7 @@ int dump_file(int img, const char *path, int out) {
   ntfs_volume *p_ntfs_volume = NULL;
   ntfs_inode *p_ntfs_inode = NULL;
   ntfs_attr *p_ntfs_attr = NULL;
-  u32 blk_sz = 0;
-  s64 offset = 0;
-  s64 written = 0;
-  s64 read = 0;
-  u32 buf_size = 1 << 12;
-  char *buf = NULL;
+  u32 blk_sz = 1 << 12;
   int res = 0;
   int err = 0;
   if ((res = fd_to_path(img, img_file)) < 0) {
