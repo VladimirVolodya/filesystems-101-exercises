@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#define _STRUCT_TIMESPEC 1
 #define __timespec_defined
 #include <ntfs-3g/attrib.h>
 #include <ntfs-3g/dir.h>
