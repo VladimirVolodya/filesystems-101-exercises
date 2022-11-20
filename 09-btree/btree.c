@@ -113,7 +113,7 @@ void btree_search_node(struct btree_node **node, long *st_idx, long *idx,
                        int x) {
   struct btree_node *parent = NULL;
   struct btree_node *cur = *node;
-  long i;
+  long i = 0;
   long st_i = -1;
   while (true) {
     i = 0;
