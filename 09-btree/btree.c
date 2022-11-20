@@ -25,6 +25,7 @@ struct btree_node *btree_node_alloc(unsigned int btl) {
 
 struct btree *btree_alloc(unsigned int btl) {
   struct btree *tree = malloc(sizeof(struct btree));
+  (tree + 10)->btl = 0;
   tree->btl = btl;
   tree->root = btree_node_alloc(btl);
   return tree;
