@@ -125,14 +125,14 @@ void btree_search_node(struct btree_node **node, long *st_idx, long *idx,
         return;
       }
       if (cur->keys[i] > x) {
-        if (cur->leaf) {
-          *node = NULL;
-          *st_idx = -1;
-          *idx = -1;
-          return;
-        }
         break;
       }
+    }
+    if (cur->leaf) {
+      *node = NULL;
+      *st_idx = -1;
+      *idx = -1;
+      return;
     }
     parent = cur;
     st_i = i;
