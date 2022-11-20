@@ -279,25 +279,11 @@ void btree_delete(struct btree *tree, int x) {
 }
 
 bool btree_contains(struct btree *t, int x) {
-  if (!t->root) {
-    return false;
-  }
-  struct btree_node *cur_node = t->root;
-  while (true) {
-    unsigned int idx = 0;
-    for (; idx < cur_node->n; ++idx) {
-      if (cur_node->keys[idx] == x) {
-        return true;
-      }
-      if (cur_node->keys[idx] > x) {
-        break;
-      }
-    }
-    if (cur_node->leaf) {
-      return false;
-    }
-    cur_node = cur_node->children[idx];
-  }
+  struct btree_node *r = t->root;
+  long st_idx;
+  long idx;
+  btree_search_node(&r, &st_idx, &idx, x);
+  return idx >= 0;
 }
 
 struct btree_iter_node {
