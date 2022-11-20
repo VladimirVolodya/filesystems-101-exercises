@@ -190,8 +190,8 @@ struct btree_node *btree_node_search_max(struct btree_node *node) {
 
 void btree_node_delete(struct btree_node *node, int x, unsigned int btl) {
   struct btree_node *parent = node;
-  long idx;
-  long st_idx;
+  long idx = 0;
+  long st_idx = 0;
   btree_search_node(&parent, &st_idx, &idx, x);
   if (idx < 0) {
     return;
