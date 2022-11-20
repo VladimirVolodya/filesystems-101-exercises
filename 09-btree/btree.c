@@ -237,7 +237,7 @@ struct btree_node *btree_node_search(struct btree_node *node, int key) {
   while (i < node->n && key > node->keys[i]) {
     ++i;
   }
-  if (node->keys[i] == key) {
+  if (i < node->n && node->keys[i] == key) {
     return node;
   }
   if (node->leaf) {
