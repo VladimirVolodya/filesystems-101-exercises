@@ -237,9 +237,14 @@ static int ext2_fuse_getattr(const char *path, struct stat *p_stat,
 }
 
 static int ext2_fuse_open(const char *path, struct fuse_file_info *fi) {
-  (void)path;
-  (void)fi;
-  return -EROFS;
+  int inode;
+  if ((fi->flags & O_ACCMODE) != O_RDONLY) {
+    return -EROFS;
+  }
+  if (search_inode(ext2_img, &ext2_sb, EXT2_ROOT_INO, path) < 0) {
+    return -ENOENT;
+  }
+  return 0;
 }
 
 static int read_dirents_from_blk(const char *blk_buf, ssize_t to_read,
