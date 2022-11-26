@@ -237,7 +237,6 @@ static int ext2_fuse_getattr(const char *path, struct stat *p_stat,
 }
 
 static int ext2_fuse_open(const char *path, struct fuse_file_info *fi) {
-  int inode;
   if ((fi->flags & O_ACCMODE) != O_RDONLY) {
     return -EROFS;
   }
