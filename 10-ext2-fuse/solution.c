@@ -441,6 +441,7 @@ static int ext2_fuse_read(const char *path, char *buf, size_t size,
     free(blk_buf);
     return res;
   }
+  left_read = inode.i_size;
   for (size_t i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
     to_read = left_read > blk_sz ? blk_sz : left_read;
     if (pread(ext2_img, blk_buf, to_read, inode.i_block[i] * blk_sz) < 0) {
