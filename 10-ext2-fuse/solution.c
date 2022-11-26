@@ -249,13 +249,13 @@ static int ext2_fuse_open(const char *path, struct fuse_file_info *fi) {
 static int read_dirents_from_blk(const char *blk_buf, ssize_t to_read,
                                  void *buf, fuse_fill_dir_t filler) {
   const char *cur = blk_buf;
-  struct ext2_dir_entry *p_de;
+  struct ext2_dir_entry_2 *p_de;
   struct ext2_inode inode;
   struct stat stat;
   char path[PATH_MAX];
   int res;
   while (to_read && cur - blk_buf < to_read) {
-    p_de = (struct ext2_dir_entry *)cur;
+    p_de = (struct ext2_dir_entry_2 *)cur;
     if (!p_de->inode) {
       return 0;
     }
@@ -329,6 +329,10 @@ static int ext2_fuse_readdir(const char *path, void *buf,
   }
   left_read = inode.i_size;
   for (uint32_t i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
+    if (!inode.i_block[i]) {
+      free(blk_buf);
+      return 0;
+    }
     to_read = left_read > blk_sz ? blk_sz : left_read;
     if (pread(ext2_img, blk_buf, to_read, inode.i_block[i] * blk_sz) < 0) {
       free(blk_buf);
@@ -356,6 +360,11 @@ static int ext2_fuse_readdir(const char *path, void *buf,
   }
   for (uint32_t i = 0; i < ub; ++i) {
     to_read = left_read > blk_sz ? blk_sz : left_read;
+    if (!ind_blk_buf[i]) {
+      free(ind_blk_buf);
+      free(blk_buf);
+      return 0;
+    }
     if (pread(ext2_img, blk_buf, to_read, ind_blk_buf[i] * blk_sz) < 0) {
       free(ind_blk_buf);
       free(blk_buf);
@@ -385,6 +394,12 @@ static int ext2_fuse_readdir(const char *path, void *buf,
     return -errno;
   }
   for (uint32_t i = 0; i < ub; ++i) {
+    if (!dind_blk_buf[i]) {
+      free(dind_blk_buf);
+      free(ind_blk_buf);
+      free(blk_buf);
+      return 0;
+    }
     if (pread(ext2_img, ind_blk_buf, blk_sz, dind_blk_buf[i] * blk_sz) < 0) {
       free(dind_blk_buf);
       free(ind_blk_buf);
@@ -393,6 +408,12 @@ static int ext2_fuse_readdir(const char *path, void *buf,
     }
     for (uint32_t j = 0; j < ub; ++j) {
       to_read = left_read > blk_sz ? blk_sz : left_read;
+      if (!ind_blk_buf[j]) {
+        free(dind_blk_buf);
+        free(ind_blk_buf);
+        free(blk_buf);
+        return 0;
+      }
       if (pread(ext2_img, blk_buf, to_read, ind_blk_buf[j] * blk_sz) < 0) {
         free(dind_blk_buf);
         free(ind_blk_buf);
