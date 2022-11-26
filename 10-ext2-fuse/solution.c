@@ -421,6 +421,7 @@ static int ext2_fuse_readdir(const char *path, void *buf,
 
 static int ext2_fuse_read(const char *path, char *buf, size_t size,
                           off_t offset, struct fuse_file_info *fi) {
+  (void)fi;
   int inode_nr;
   int res;
   size_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
