@@ -351,7 +351,7 @@ static int ext2_fuse_readdir(const char *path, void *buf,
       return 0;
     }
   }
-
+  assert(0);
   ind_blk_buf = malloc(blk_sz);
   if (pread(ext2_img, ind_blk_buf, blk_sz,
             inode.i_block[EXT2_IND_BLOCK] * blk_sz) < 0) {
