@@ -3,6 +3,8 @@
 #include <ext2fs/ext2fs.h>
 #include <fuse.h>
 #include <linux/limits.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 int ext2_img;
 struct ext2_super_block ext2_sb;
@@ -224,11 +226,11 @@ static int ext2_fuse_getattr(const char *path, struct stat *p_stat,
   memset(p_stat, 0, sizeof(struct stat));
   int inode_nr;
   int res;
+  struct ext2_inode inode;
   if ((inode_nr = (int)search_inode(ext2_img, &ext2_sb, EXT2_ROOT_INO, path)) <
       0) {
     return -ENOENT;
   }
-  struct ext2_inode inode;
   if ((res = read_inode(ext2_img, &ext2_sb, &inode, inode_nr)) < 0) {
     return res;
   }
@@ -527,6 +529,23 @@ void *ext2_fuse_init(struct fuse_conn_info *conn, struct fuse_config *config) {
   return NULL;
 }
 
+int ext2_fuse_opendir(const char *path, struct fuse_file_info *info) {
+  (void)info;
+  struct ext2_inode inode;
+  int res = 0;
+  int inode_nr;
+  if ((inode_nr = search_inode(ext2_img, &ext2_sb, EXT2_ROOT_INO, path)) < 0) {
+    return inode_nr;
+  }
+  if ((res = read_inode(ext2_img, &ext2_sb, &inode, inode_nr)) < 0) {
+    return res;
+  }
+  if ((inode.i_mode & S_IFMT) != S_IFDIR) {
+    return -ENOTDIR;
+  }
+  return 0;
+}
+
 static const struct fuse_operations ext2_ops = {
     .write = ext2_fuse_write,
     .create = ext2_fuse_create,
@@ -538,6 +557,7 @@ static const struct fuse_operations ext2_ops = {
     .open = ext2_fuse_open,
     .read = ext2_fuse_read,
     .init = ext2_fuse_init,
+    .opendir = ext2_fuse_opendir,
 };
 
 int ext2fuse(int img, const char *mntp) {
