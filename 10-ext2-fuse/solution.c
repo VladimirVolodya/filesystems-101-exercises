@@ -309,6 +309,7 @@ static int ext2_fuse_readdir(const char *path, void *buf,
   (void)offset;
   (void)fi;
   (void)flags;
+  assert(0);
   int inode_nr;
   int res;
   uint32_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
@@ -328,7 +329,6 @@ static int ext2_fuse_readdir(const char *path, void *buf,
     free(blk_buf);
     return res;
   }
-  assert(0);
   left_read = inode.i_size;
   for (uint32_t i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
     if (!inode.i_block[i]) {
