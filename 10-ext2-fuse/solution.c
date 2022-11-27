@@ -577,7 +577,7 @@ static const struct fuse_operations ext2_ops = {
 };
 
 int ext2fuse(int img, const char *mntp) {
-  assert(0);
+  //   assert(0);
   ext2_img = img;
   if (read_sb(img, &ext2_sb) < 0) {
     return -1;
