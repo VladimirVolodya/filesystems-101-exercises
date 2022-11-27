@@ -308,7 +308,6 @@ static int ext2_fuse_readdir(const char *path, void *buf,
   (void)offset;
   (void)fi;
   (void)flags;
-  assert(0);
   int inode_nr;
   int res;
   uint32_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
