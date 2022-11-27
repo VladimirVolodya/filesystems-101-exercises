@@ -328,6 +328,7 @@ static int ext2_fuse_readdir(const char *path, void *buf,
     free(blk_buf);
     return res;
   }
+  assert(0);
   left_read = inode.i_size;
   for (uint32_t i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
     if (!inode.i_block[i]) {
@@ -351,7 +352,6 @@ static int ext2_fuse_readdir(const char *path, void *buf,
       return 0;
     }
   }
-  assert(0);
   ind_blk_buf = malloc(blk_sz);
   if (pread(ext2_img, ind_blk_buf, blk_sz,
             inode.i_block[EXT2_IND_BLOCK] * blk_sz) < 0) {
