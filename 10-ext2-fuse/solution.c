@@ -246,29 +246,70 @@ static int ext2_fuse_open(const char *path, struct fuse_file_info *fi) {
   return 0;
 }
 
-static int read_dirents_from_blk(const char *blk_buf, ssize_t to_read,
-                                 void *buf, fuse_fill_dir_t filler) {
-  const char *cur = blk_buf;
-  struct ext2_dir_entry_2 *p_de;
-  struct ext2_inode inode;
-  struct stat stat;
+static int read_dirents_from_blk(const char *blk_buf, void *buf,
+                                 fuse_fill_dir_t filler) {
   char path[PATH_MAX];
+  struct stat stat;
+  struct ext2_inode inode;
+  size_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
+  const char *cur = blk_buf;
   int res;
-  while (to_read && cur - blk_buf < to_read) {
-    p_de = (struct ext2_dir_entry_2 *)cur;
-    if (!p_de->inode) {
-      return 0;
+  while ((cur - blk_buf) + sizeof(struct ext2_dir_entry) < blk_sz) {
+    struct ext2_dir_entry *p_de = (struct ext2_dir_entry *)cur;
+    if (!p_de->rec_len) {
+      break;
     }
-    memset(path, 0, PATH_MAX);
-    strncpy(path, p_de->name, p_de->name_len);
-    if ((res = read_inode(ext2_img, &ext2_sb, &inode, p_de->inode)) < 0) {
+    if (p_de->inode) {
+      strncpy(path, p_de->name, p_de->name_len);
+      path[p_de->name_len] = '\0';
+      if ((res = read_inode(ext2_img, &ext2_sb, &inode, p_de->inode) < 0)) {
+        return res;
+      }
+      cp_inode_stat(p_de->inode, &inode, &stat);
+      filler(buf, path, &stat, 0, 0);
+    }
+    cur += p_de->rec_len;
+  }
+  return 0;
+}
+
+static int read_dirents_from_ind_blk(const uint32_t *ind_blk_buf, void *buf,
+                                     fuse_fill_dir_t filler) {
+  size_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
+  char *blk_buf = malloc(blk_sz);
+  size_t ub = blk_sz / 4;
+  int res;
+  for (size_t i = 0; i < ub && ind_blk_buf[i]; i++) {
+    if (pread(ext2_img, blk_buf, blk_sz, ind_blk_buf[i] * blk_sz) < 0) {
+      free(blk_buf);
+      return -errno;
+    }
+    if ((res = read_dirents_from_blk(blk_buf, buf, filler)) < 0) {
+      free(blk_buf);
       return res;
     }
-    cp_inode_stat(p_de->inode, &inode, &stat);
-    filler(buf, path, &stat, 0, 0);
-    cur += p_de->rec_len;
-    to_read -= p_de->rec_len;
   }
+  free(blk_buf);
+  return 0;
+}
+
+static int read_dirents_from_dind_blk(const uint32_t *dind_blk_buf, void *buf,
+                                      fuse_fill_dir_t filler) {
+  size_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
+  uint32_t *ind_blk_buf = malloc(blk_sz);
+  size_t ub = blk_sz / 4;
+  int res;
+  for (unsigned i = 0; i < ub && dind_blk_buf[i]; i++) {
+    if (pread(ext2_img, ind_blk_buf, blk_sz, dind_blk_buf[i] * blk_sz) < 0) {
+      free(ind_blk_buf);
+      return -errno;
+    }
+    if ((res = read_dirents_from_ind_blk(ind_blk_buf, buf, filler)) < 0) {
+      free(ind_blk_buf);
+      return res;
+    }
+  }
+  free(ind_blk_buf);
   return 0;
 }
 
@@ -308,137 +349,55 @@ static int ext2_fuse_readdir(const char *path, void *buf,
   (void)offset;
   (void)fi;
   (void)flags;
-  int inode_nr;
-  int res;
-  uint32_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
-  char *blk_buf = malloc(blk_sz);
-  uint32_t *ind_blk_buf;
-  uint32_t *dind_blk_buf;
-  uint32_t left_read;
-  uint32_t to_read;
-  uint32_t ub = blk_sz / 4;
+
   struct ext2_inode inode;
+  int inode_nr;
+  size_t blk_sz = EXT2_BLOCK_SIZE(&ext2_sb);
+  int res;
   if ((inode_nr = (int)search_inode(ext2_img, &ext2_sb, EXT2_ROOT_INO, path)) <
       0) {
-    free(blk_buf);
-    return -ENOENT;
+    return inode_nr;
   }
   if ((res = read_inode(ext2_img, &ext2_sb, &inode, inode_nr)) < 0) {
-    free(blk_buf);
     return res;
   }
-  left_read = inode.i_size;
-  for (uint32_t i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
+  char *blk_buf = malloc(blk_sz);
+  for (unsigned i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
     if (!inode.i_block[i]) {
-      free(blk_buf);
-      return 0;
+      break;
     }
-    to_read = left_read > blk_sz ? blk_sz : left_read;
-    if (pread(ext2_img, blk_buf, to_read, inode.i_block[i] * blk_sz) < 0) {
+    if (pread(ext2_img, blk_buf, blk_sz, inode.i_block[i] * blk_sz) < 0) {
       free(blk_buf);
       return -errno;
     }
-    // body
-    if ((res = read_dirents_from_blk(blk_buf, to_read, buf, filler)) < 0) {
+    if ((res = read_dirents_from_blk(blk_buf, buf, filler)) < 0) {
+      return res;
+    }
+  }
+  if (inode.i_block[EXT2_IND_BLOCK]) {
+    if (pread(ext2_img, blk_buf, blk_sz,
+              inode.i_block[EXT2_IND_BLOCK] * blk_sz) < 0) {
+      free(blk_buf);
+      return -errno;
+    }
+    if ((res = read_dirents_from_ind_blk((uint32_t *)blk_buf, buf, filler)) <
+        0) {
       free(blk_buf);
       return res;
     }
-    //
-    left_read -= to_read;
-    if (!left_read) {
-      free(blk_buf);
-      return 0;
-    }
   }
-  ind_blk_buf = malloc(blk_sz);
-  if (pread(ext2_img, ind_blk_buf, blk_sz,
-            inode.i_block[EXT2_IND_BLOCK] * blk_sz) < 0) {
-    free(ind_blk_buf);
-    free(blk_buf);
-    return -errno;
-  }
-  for (uint32_t i = 0; i < ub; ++i) {
-    to_read = left_read > blk_sz ? blk_sz : left_read;
-    if (!ind_blk_buf[i]) {
-      free(ind_blk_buf);
-      free(blk_buf);
-      return 0;
-    }
-    if (pread(ext2_img, blk_buf, to_read, ind_blk_buf[i] * blk_sz) < 0) {
-      free(ind_blk_buf);
+  if (inode.i_block[EXT2_DIND_BLOCK]) {
+    if (pread(ext2_img, blk_buf, blk_sz,
+              inode.i_block[EXT2_DIND_BLOCK] * blk_sz) < 0) {
       free(blk_buf);
       return -errno;
     }
-    // body
-    if ((res = read_dirents_from_blk(blk_buf, to_read, buf, filler)) < 0) {
-      free(ind_blk_buf);
+    if ((res = read_dirents_from_dind_blk((uint32_t *)blk_buf, buf, filler)) <
+        0) {
       free(blk_buf);
       return res;
     }
-    //
-    left_read -= to_read;
-    if (!left_read) {
-      free(ind_blk_buf);
-      free(blk_buf);
-      return 0;
-    }
   }
-
-  dind_blk_buf = malloc(blk_sz);
-  if (pread(ext2_img, dind_blk_buf, blk_sz,
-            inode.i_block[EXT2_DIND_BLOCK] * blk_sz) < 0) {
-    free(dind_blk_buf);
-    free(ind_blk_buf);
-    free(blk_buf);
-    return -errno;
-  }
-  for (uint32_t i = 0; i < ub; ++i) {
-    if (!dind_blk_buf[i]) {
-      free(dind_blk_buf);
-      free(ind_blk_buf);
-      free(blk_buf);
-      return 0;
-    }
-    if (pread(ext2_img, ind_blk_buf, blk_sz, dind_blk_buf[i] * blk_sz) < 0) {
-      free(dind_blk_buf);
-      free(ind_blk_buf);
-      free(blk_buf);
-      return -errno;
-    }
-    for (uint32_t j = 0; j < ub; ++j) {
-      to_read = left_read > blk_sz ? blk_sz : left_read;
-      if (!ind_blk_buf[j]) {
-        free(dind_blk_buf);
-        free(ind_blk_buf);
-        free(blk_buf);
-        return 0;
-      }
-      if (pread(ext2_img, blk_buf, to_read, ind_blk_buf[j] * blk_sz) < 0) {
-        free(dind_blk_buf);
-        free(ind_blk_buf);
-        free(blk_buf);
-        return -errno;
-      }
-      // body
-      if ((res = read_dirents_from_blk(blk_buf, to_read, buf, filler)) < 0) {
-        free(dind_blk_buf);
-        free(ind_blk_buf);
-        free(blk_buf);
-        return res;
-      }
-      //
-      left_read -= to_read;
-      if (!left_read) {
-        free(dind_blk_buf);
-        free(ind_blk_buf);
-        free(blk_buf);
-        return 0;
-      }
-    }
-  }
-
-  free(dind_blk_buf);
-  free(ind_blk_buf);
   free(blk_buf);
   return 0;
 }
@@ -562,7 +521,7 @@ static int ext2_fuse_read(const char *path, char *buf, size_t size,
   return 0;
 }
 
-void *ext2_init(struct fuse_conn_info *conn, struct fuse_config *config) {
+void *ext2_fuse_init(struct fuse_conn_info *conn, struct fuse_config *config) {
   (void)conn;
   (void)config;
   return NULL;
@@ -578,7 +537,7 @@ static const struct fuse_operations ext2_ops = {
     .readdir = ext2_fuse_readdir,
     .open = ext2_fuse_open,
     .read = ext2_fuse_read,
-    .init = ext2_init,
+    .init = ext2_fuse_init,
 };
 
 int ext2fuse(int img, const char *mntp) {
