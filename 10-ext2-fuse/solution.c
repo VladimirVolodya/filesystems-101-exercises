@@ -1,6 +1,5 @@
 #include "solution.h"
 
-#include <assert.h>
 #include <ext2fs/ext2fs.h>
 #include <fuse.h>
 #include <linux/limits.h>
@@ -564,6 +563,12 @@ static int ext2_fuse_read(const char *path, char *buf, size_t size,
   return 0;
 }
 
+void *ext2_init(struct fuse_conn_info *conn, struct fuse_config *config) {
+  (void)conn;
+  (void)config;
+  return NULL;
+}
+
 static const struct fuse_operations ext2_ops = {
     .write = ext2_fuse_write,
     .create = ext2_fuse_create,
@@ -574,10 +579,10 @@ static const struct fuse_operations ext2_ops = {
     .readdir = ext2_fuse_readdir,
     .open = ext2_fuse_open,
     .read = ext2_fuse_read,
+    .init = ext2_init,
 };
 
 int ext2fuse(int img, const char *mntp) {
-  //   assert(0);
   ext2_img = img;
   if (read_sb(img, &ext2_sb) < 0) {
     return -1;
