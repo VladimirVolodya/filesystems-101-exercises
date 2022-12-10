@@ -120,17 +120,18 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	}
 
 	for i := range req.Data {
+		req_idx := i
 		wg.Go(ctx, func(ctx context.Context) error {
 			s.mutex.Lock()
 			back_idx := s.cur_back
 			s.cur_back = (s.cur_back + 1) % backs_num
 			s.mutex.Unlock()
-			resp, err := clients[back_idx].Hash(ctx, &hashpb.HashReq{Data: req.Data[i]})
+			resp, err := clients[back_idx].Hash(ctx, &hashpb.HashReq{Data: req.Data[req_idx]})
 			if err != nil {
 				return err
 			}
 			s.mutex.Lock()
-			hashes[i] = resp.Hash
+			hashes[req_idx] = resp.Hash
 			s.mutex.Unlock()
 			return nil
 		})
