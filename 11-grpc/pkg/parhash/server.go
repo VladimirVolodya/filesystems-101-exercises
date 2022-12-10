@@ -51,7 +51,6 @@ type Server struct {
 	stop 	  context.CancelFunc
 	l    	  net.Listener
 	wg   	  sync.WaitGroup
-	conf 	  Config
 	mutex 	  sync.Mutex
 	semaphore *semaphore.Weighted
 	cur_back   int
