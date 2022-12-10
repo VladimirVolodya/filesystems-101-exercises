@@ -54,14 +54,14 @@ type Server struct {
 	conf 	  Config
 	mutex 	  sync.Mutex
 	semaphore *semaphore.Weighted
-	curBack   uint32
+	cur_back   int
 }
 
 func New(conf Config) *Server {
 	return &Server{
 		conf:      conf,
 		semaphore: semaphore.NewWeighted(int64(conf.Concurrency)),
-		curBack:   0,
+		cur_back:   0,
 	}
 }
 
@@ -105,9 +105,9 @@ func (s *Server) Stop() {
 
 func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (resp *parhashpb.ParHashResp, err error) {
 	var (
-		backAdrNum = len(s.conf.BackendAddrs)
-		cons       = make([]*grpc.ClientConn, backAdrNum)
-		clients    = make([]hashpb.HashSvcClient, backAdrNum)
+		backs_num = len(s.conf.BackendAddrs)
+		cons       = make([]*grpc.ClientConn, backs_num)
+		clients    = make([]hashpb.HashSvcClient, backs_num)
 		wg         = workgroup.New(workgroup.Config{Sem: s.semaphore})
 		hashes     = make([][]byte, len(req.Data))
 	)
@@ -123,8 +123,8 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	for i := range req.Data {
 		wg.Go(ctx, func(ctx context.Context) error {
 			s.mutex.Lock()
-			back_idx := s.curBack
-			s.curBack = (s.curBack + 1) % backAdrNum
+			back_idx := s.cur_back
+			s.cur_back = (s.cur_back + 1) % backs_num
 			s.mutex.Unlock()
 			resp, err := clients[back_idx].Hash(ctx, &hashpb.HashReq{Data: req.Data[i]})
 			if err != nil {
